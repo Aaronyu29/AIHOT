@@ -37,6 +37,8 @@
 { "feedUrl": "https://example.com/feed.xml" }
 ```
 
+只采集订阅提供的标题、摘要及原文链接时，设 `fetchPublicContent: false`：缺少正文的条目直接按摘要处理，不请求原文网页，也不调用 Jina。摘要仍存为摘要，不标记成完整正文；订阅直接提供的完整正文仍可保留。未配置时保留原来的正文补全行为。
+
 可选：`summaryIsBody`（确认文字订阅里的摘要就是全文时，将 RSS 的 `description`、Atom 的 `summary` 当正文，不再去抓原文页）、`allowCategories` / `denyCategories`（按订阅里的分类过滤）。
 
 所有信源的 YouTube、Vimeo 视频播放页都不作为文章正文提取。Media RSS 的视频描述保留为摘要，即使设置了 `summaryIsBody` 也不会把描述当成视频字幕；订阅通过 `content` / `content:encoded` 提供的真实文字仍可使用。其他文章中嵌入视频，不影响文章本身的正文读取。

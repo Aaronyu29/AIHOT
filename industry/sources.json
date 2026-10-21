@@ -581,7 +581,8 @@
         "feedUrl": "https://www.theblock.co/rss.xml",
         "_aihot": {
           "initialBackfillLimit": 8
-        }
+        },
+        "fetchPublicContent": false
       },
       "tier": "T2",
       "participation_mode": "editorial",
