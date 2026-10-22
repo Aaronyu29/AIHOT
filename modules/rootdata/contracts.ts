@@ -56,6 +56,8 @@ export interface FundingAdminProject extends FundingProject {
   rootdataId: number | null;
   publicReason: string;
   lastError: string | null;
+  autoReview?: {decision: 'approve' | 'defer' | 'reject'; reason: string; reviewedAt: string; model: string} | null;
+  autoReviewError?: string | null;
 }
 
 export interface FundingStatus {
