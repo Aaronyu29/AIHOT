@@ -3,6 +3,7 @@ import type { PoolResponse, TimelineFilters } from "@aihot/contracts/site";
 import { beijingDate, beijingMidnight } from "@aihot/contracts/time";
 import { one, sql, withCustomPlans, type Db } from "../db.ts";
 import { cachedByKey, sharedSearch } from "../lib/cache.ts";
+import { ENTITIES, entityNames } from "../editorial/vocabulary.ts";
 import {
   categoryCondition, channelCondition, ITEM_COLUMNS, ITEM_FROM, seatHolders, tagCondition, toFeedItemSummary,
   type ItemRow,
@@ -77,8 +78,8 @@ export function directMatchCondition(terms: string[]) {
 const normalizeAlias = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
 
 /**
- * The company a whole query names: a company topic's slug, full name,
- * each part of "OpenAI / ChatGPT" and its other names. Then the search also takes the articles about
+ * The subject a whole query names: a topic alias or a name in the subject registry.
+ * Search keeps recognizing subjects even when their browse topic is removed. It also takes articles about
  * that company (their subject tag), so "claude" finds Anthropic's news that never writes the word.
  * Only the whole query counts: "deepseek v4" stays a text search, not all of DeepSeek.
  */
@@ -86,7 +87,9 @@ function queryEntityTag(q: string): string | null {
   const want = normalizeAlias(q);
   if (!want) return null;
   const topic = TOPICS.find((t) => t.entityId && t.aliases.some((a) => normalizeAlias(a) === want));
-  return topic ? `entity:${topic.entityId}` : null;
+  if (topic) return `entity:${topic.entityId}`;
+  const entity = Object.entries(ENTITIES).find(([id, e]) => [id, ...entityNames(e)].some((a) => normalizeAlias(a) === want));
+  return entity ? `entity:${entity[0]}` : null;
 }
 
 /**
