@@ -92,7 +92,7 @@ def install(root, bundle, sha, run_id):
             os.replace(staged, root / '.env')
             run('docker', 'tag', image, 'aihot-app')
             # Only migrations: never reseed production sources or rebuild the image.
-            run('docker', 'compose', 'run', '--rm', '--no-deps', '--no-build', '--pull', 'never', 'setup', 'node', 'scripts/migrate.ts')
+            run('docker', 'compose', 'run', '--rm', '--no-deps', '--pull', 'never', 'setup', 'node', 'scripts/migrate.ts')
             run('docker', 'compose', 'up', '-d', '--no-deps', '--no-build', '--pull', 'never', 'api', 'web', 'worker')
             for attempt in range(60):
                 probe = subprocess.run(['docker', 'exec', 'aihot-web-1', 'node', '-e',
