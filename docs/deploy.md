@@ -255,6 +255,23 @@ docker compose logs -f --tail 100 api worker web
 - **付费采集**（X、公众号、Jina）：按请求计费，默认不启用，填了 key 才会用。
 - 所有付费服务都有每分钟、每小时、每天的调用上限（后台“设置 → 付费请求上限”），超过就暂停，不会一夜之间刷爆账单。填 0 表示立即停用这个服务。
 
+## 从 CI 产物更新现有服务器
+
+`Check` 在 PR 和 main push 时运行类型检查、网页测试、后端测试、构建与 Docker 页面检查。
+main 的 Docker 检查通过后，保存它实际测试过的镜像 `aihot-image-<完整提交 SHA>`，包含镜像 ID、提交、运行编号和 SHA-256 校验，保留 7 天。部署要求整个 Check 工作流成功，不能只看 Docker job。镜像在 CI 内构建，服务器不再重新构建。
+
+在已有 GitHub CLI 登录、Python 3.11+、OpenSSH 的运维电脑执行：
+
+```bash
+python scripts/deploy-ci.py --host ubuntu@<服务器IP> --identity <SSH私钥路径>
+```
+
+默认仓库 `Aaronyu29/AIHOT`、服务器目录 `/opt/aihot`；可传 `--repo`、`--root`，或用 `--run-id` 指定当前 main 的成功运行。需要事先验证 SSH 主机密钥，服务器用户需要免密 sudo，现有 Docker Compose 项目名为 `aihot`。过期产物需重新运行当前 main 的 Check。此命令不配置 GitHub SSH 密钥，也不会每次 push 自动发布。
+
+脚本检查当前 main、完整 CI 结果、产物校验和镜像 revision，先载入镜像，再按现有停止时限排空 worker；网页保持服务直到切换。备份环境、各角色原镜像身份和数据库后，只运行迁移（不重置或重新 seed 信源），更新 api、worker、web。数据库与 Caddy 容器保持不变。切换应用时可能有短暂中断，并非零停机发布。
+
+版本或页面检查失败时，恢复原环境和各角色原镜像；已执行的在线迁移不自动撤销，也不拿备份覆盖线上数据库。备份和部署回执保存在 `/opt/aihot/.data/deployments/ci-<运行编号>-<时间戳>/`，可能含敏感数据，应保持仅管理员可读。部署期间不要同时从其他对话或终端发布。
+
 ## 不用 Docker
 
 需要 Node.js 24.11 以上和 PostgreSQL 16 或 17，系统用 Linux 或 macOS；Windows 上请在 WSL2 里运行，或者用上面的 Docker 方式。

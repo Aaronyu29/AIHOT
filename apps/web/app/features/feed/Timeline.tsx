@@ -215,9 +215,11 @@ export function Timeline({ initial, filters }: { initial: TimelineResponse; filt
   }, [navigation.state, navigation.location, historyKey]);
   useSaveOnLeave(historyKey, () => stateRef.current);
 
-  const loadMore = useCallback(async () => {
+  const loadMore = useCallback(async (mode: "auto" | "manual" = "manual") => {
     const s = stateRef.current;
     if (!s.nextCursor || pageRequest.current) return;
+    // Observer notifications and unread-filter effects can arrive after the limit was reached.
+    if (mode === "auto" && s.batches >= AUTO_BATCHES) return;
     const key = listPath("/api/site/timeline", filterParams(filters));
     const controller = new AbortController();
     pageRequest.current = controller;
@@ -264,7 +266,7 @@ export function Timeline({ initial, filters }: { initial: TimelineResponse; filt
     const el = sentinel.current;
     if (!el || !state.nextCursor || state.batches >= AUTO_BATCHES) return;
     const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) void loadMore();
+      if (entries.some((e) => e.isIntersecting)) void loadMore("auto");
     }, { rootMargin: "900px 0px" });
     io.observe(el);
     return () => io.disconnect();
@@ -291,7 +293,7 @@ export function Timeline({ initial, filters }: { initial: TimelineResponse; filt
   useEffect(() => {
     if (!unreadOnly || visibleCount > 0 || loadingMore || loadError) return;
     if (!state.nextCursor || state.batches >= AUTO_BATCHES) return;
-    void loadMore();
+    void loadMore("auto");
   }, [unreadOnly, visibleCount, loadingMore, loadError, state.nextCursor, state.batches, loadMore]);
 
   const toggleDay = (day: string) =>
@@ -347,7 +349,7 @@ export function Timeline({ initial, filters }: { initial: TimelineResponse; filt
       })}
 
       <div ref={sentinel} aria-hidden="true" />
-      <FeedEnd loading={loadingMore} error={loadError} hasMore={!!state.nextCursor} manual={state.batches >= AUTO_BATCHES} empty={visibleCount === 0} onMore={loadMore} />
+      <FeedEnd loading={loadingMore} error={loadError} hasMore={!!state.nextCursor} manual={state.batches >= AUTO_BATCHES} empty={visibleCount === 0} onMore={() => void loadMore()} />
     </div>
   );
 }

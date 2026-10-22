@@ -23,6 +23,7 @@ let web: WebServer;
 let origin: string;
 let chrome: Browser;
 let failNextPage = false;
+let boundaryReads = 0;
 
 const api = fakeApi((url, res) => {
   const p = url.pathname;
@@ -32,6 +33,7 @@ const api = fakeApi((url, res) => {
     const tag = url.searchParams.get("tag");
     const cursor = url.searchParams.get("cursor");
     if (tag === "boundary") {
+      boundaryReads += 1;
       const n = cursor ? Number(cursor) : 1;
       return { filters: { channel: "all", category: null, tag }, cards: [card(`boundary-${n}`, `批次 ${n}`)], nextCursor: n < 5 ? String(n + 1) : null, hot: null, dayCounts: { "2026-10-04": 5 } };
     }
@@ -196,11 +198,34 @@ test("all-read pages stop at the automatic bound and can continue manually witho
   const context = await readerWith(["boundary-1", "boundary-2", "boundary-3", "boundary-4"]);
   const page = await context.newPage();
   try {
+    // A viewport callback may already be queued when the list reaches its automatic bound.
+    // Deliver one late, after the button appears: it must not fetch another page on its own.
+    await page.addInitScript(() => {
+      const NativeObserver = window.IntersectionObserver;
+      const queued: Array<() => void> = [];
+      (window as unknown as { flushTimelineIntersections: () => void }).flushTimelineIntersections = () => {
+        for (const callback of queued.splice(0)) callback();
+      };
+      window.IntersectionObserver = class extends NativeObserver {
+        constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+          super((entries, observer) => {
+            callback(entries, observer);
+            if (options?.rootMargin === "900px 0px" && entries.some((entry) => entry.isIntersecting)) {
+              queued.push(() => callback(entries, observer));
+            }
+          }, options);
+        }
+      };
+    });
     await page.goto(`${origin}/featured?tag=boundary`);
     const raw = await page.evaluate(() => localStorage.getItem("aihot-read-items"));
     await page.getByRole("button", { name: "只看未读" }).click();
     const more = page.getByRole("button", { name: "加载更多", exact: true });
     await expect(more).toBeVisible();
+    const readsAtBound = boundaryReads;
+    await page.evaluate(() => (window as unknown as { flushTimelineIntersections: () => void }).flushTimelineIntersections());
+    await expect(more).toBeVisible();
+    assert.equal(boundaryReads, readsAtBound, "queued viewport notifications cannot bypass the automatic bound");
     await more.click();
     await expect(more).toBeVisible();
     await expect(page.getByText("这批精选都读过了", { exact: true })).toBeVisible();
