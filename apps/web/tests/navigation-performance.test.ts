@@ -326,3 +326,14 @@ test('deep reading returns to its anchor, including folded dates',async()=>{
   }finally{await context.close();}
 });
 
+
+test('a busy search retries in its original featured or all feed',async()=>{
+  const context=await chrome.newContext();const page=await context.newPage();
+  try{
+    for(const [busy,feed] of [['/search-busy','/featured'],['/all/search-busy','/all']]){
+      await visit(page,origin+busy+'?q=database&category=ai-models');
+      await expect(page.getByRole('heading',{name:'搜索有点忙',exact:true})).toBeVisible();
+      await expect(page.getByRole('link',{name:'重试这次搜索',exact:true})).toHaveAttribute('href',feed+'?q=database&category=ai-models',{timeout:8000});
+    }
+  }finally{await context.close();}
+});

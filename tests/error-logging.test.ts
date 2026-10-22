@@ -87,3 +87,17 @@ test("the queue's PostgreSQL driver also keeps values out of worker error logs",
   assert.ok(!output.includes(MARKER));
   assert.match(output, /22P02/);
 });
+
+test("provider refusal and unknown receipt logs retain identifiers but never provider text", () => {
+  const output = run(`
+    import { logError } from '@aihot/backend/lib/log-error';
+    import { ProviderRejectedError, ReceiptUnknownError } from '@aihot/backend/providers/receipts';
+    const secret=${JSON.stringify(MARKER)};
+    const refusal=Object.assign(new ProviderRejectedError(secret,403,false),{code:'ACCESS_DENIED'});
+    const transport=Object.assign(new Error(secret),{code:'ECONNRESET'});
+    for(const error of [refusal,new ReceiptUnknownError(4242,secret,{cause:transport})]) console.log(JSON.stringify(logError(error)));
+  `);
+  assert.ok(!output.includes(MARKER));
+  assert.match(output,/403/);assert.match(output,/ACCESS_DENIED/);
+  assert.match(output,/4242/);assert.match(output,/ECONNRESET/);assert.match(output,/at /);
+});

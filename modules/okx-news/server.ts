@@ -1,5 +1,6 @@
 import { credential } from '@aihot/backend/config';
 import { sql } from '@aihot/backend/db';
+import { logTaskError } from '@aihot/backend/lib/log-error';
 import { defineServerModule } from '@aihot/backend/modules';
 import { identityKeyFor, upsertMaterial } from '@aihot/backend/content/materials';
 import { queueProcessing } from '@aihot/backend/jobs/content';
@@ -11,8 +12,9 @@ function credentials() {
   return raw ? parseProjects(raw) : null;
 }
 export async function collectNews(force = false, read: typeof fetchNews = fetchNews) {
-  if (process.env.COLLECT_ENABLED !== 'true' || !credentials()) return {status: 'disabled'};
-  const projects = credentials()!;
+  if (process.env.COLLECT_ENABLED !== 'true') return {status: 'disabled'};
+  const projects = credentials();
+  if (!projects) return {status: 'disabled'};
   return sql.begin(async tx => {
     const [lock] = await tx`SELECT pg_try_advisory_xact_lock(hashtext('okx-news.collect')) AS held`;
     if (!lock.held) return {status: 'busy'};
@@ -38,7 +40,7 @@ export async function collectNews(force = false, read: typeof fetchNews = fetchN
         const receipt = await paidRequest({service: 'okx_news', model: project.id, purpose: 'news_latest', subject: `source:${SOURCE_ID}`, identity: {path, project: project.id}, requestSummary: {path, project: project.id}}, async () => {
           try { return {response: await read(path, project)}; }
           catch (error) {
-            if (error instanceof NewsApiError) throw new ProviderRejectedError(error.message, error.status, error.status >= 500 || error.status === 429);
+            if (error instanceof NewsApiError) throw Object.assign(new ProviderRejectedError(error.message, error.status, error.status >= 500 || error.status === 429), { code: error.code.toUpperCase() });
             throw error;
           }
         });
@@ -68,6 +70,8 @@ export async function collectNews(force = false, read: typeof fetchNews = fetchN
       return {status:'ok',found,created,duplicates,filtered,pages};
     } catch (error) {
       const budget = error instanceof BudgetExceededError;
+      logTaskError(error, { msg: 'news collection failed', job: 'okx-news.collect', sourceId: SOURCE_ID,
+        runId: run.id, stage: 'collect', level: budget ? 'warn' : 'error' });
       const message = error instanceof NewsApiError || error instanceof ProviderRejectedError || budget ? error.message : 'OKX news collection failed; inspect the request receipt';
       await tx`UPDATE fetch_runs SET status='failed',finished_at=now(),error=${message} WHERE id=${run.id}`;
       await tx`UPDATE sources SET cursor=${tx.json({...previous,keyIndex,begin,end,pageCursor:cursor??null,inProgress:true})},last_fetch_at=now(),last_error=${message},fail_count=fail_count+${budget ? 0 : 1},health=CASE WHEN ${budget} THEN health ELSE 'degraded' END,next_fetch_at=now()+interval '15 minutes',updated_at=now() WHERE id=${SOURCE_ID}`;
@@ -75,4 +79,4 @@ export async function collectNews(force = false, read: typeof fetchNews = fetchN
     }
   });
 }
-export default defineServerModule({name:'okx-news',sourceKinds:{external:{fetchNow:async source=>source.id===SOURCE_ID?collectNews(true):{status:'skipped'}}},schedules:[{name:'okx-news.collect',cron:'* * * * *',when:()=>process.env.COLLECT_ENABLED==='true' && !!credentials(),run:()=>collectNews()}]});
+export default defineServerModule({name:'okx-news',sourceKinds:{external:{fetchNow:async source=>source.id===SOURCE_ID?collectNews(true):{status:'skipped'}}},schedules:[{name:'okx-news.collect',cron:'* * * * *',when:()=>process.env.COLLECT_ENABLED==='true' && !!credential('collectors','OKX_NEWS_PROJECTS_JSON'),run:()=>collectNews()}]});

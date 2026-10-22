@@ -28,7 +28,7 @@ export default function SearchBusy() {
   }, [wait]);
   const kept = new URLSearchParams();
   for (const [k, v] of new URLSearchParams(search)) if (SEARCH_PARAMS.includes(k)) kept.append(k, v);
-  const base = pathname.startsWith("/all") ? "/all" : "/";
+  const base = pathname.startsWith("/all") ? "/all" : "/featured";
   const retry = kept.toString() ? `${base}?${kept}` : base;
   const hasSearch = kept.has("q");
   const button = "inline-flex h-9 items-center rounded-full px-4 text-[13.5px]";

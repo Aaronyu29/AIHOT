@@ -6,6 +6,7 @@ import { PresentationMismatch } from "../content/presentation.ts";
 import { HttpStatusError } from "../lib/http-fetch.ts";
 import { identityKeyForUrl } from "../lib/url.ts";
 import { sha256 } from "../lib/ids.ts";
+import { logTaskError } from "../lib/log-error.ts";
 import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
 import { queueProcessing } from "../jobs/content.ts";
 import { BudgetExceededError, completeReceipt } from "../providers/receipts.ts";
@@ -387,6 +388,8 @@ export async function collectSource(sourceId: string, opts: { force?: boolean; x
     return { sourceId, status: "ok", found, created, revised };
   } catch (error) {
     if (shutdownSignal.signal.aborted) throw error;
+    logTaskError(error, { msg: "source collection failed", job: "sources.fetch", sourceId, runId: run!.id,
+      level: error instanceof BudgetExceededError ? "warn" : "error" });
     const message = String(error instanceof Error ? error.message : error).slice(0, 1000);
     await recordFetch(sql, sourceId, run!.id, { found, created, detail: null, error: message, budget: error instanceof BudgetExceededError });
     return { sourceId, status: "failed", found, created, revised, error: message };
@@ -467,6 +470,8 @@ export async function collectXShard(key: string, sourceIds: string[]): Promise<{
     return { key, status: "ok", accounts: members.length, found, created };
   } catch (error) {
     if (shutdownSignal.signal.aborted) throw error;
+    logTaskError(error, { msg: "source shard collection failed", job: "sources.fetch-x", stage: "collect",
+      level: error instanceof BudgetExceededError ? "warn" : "error" });
     const message = String(error instanceof Error ? error.message : error).slice(0, 1000);
     const budget = error instanceof BudgetExceededError;
     for (const m of members) {
