@@ -1,5 +1,7 @@
 # 部署
 
+新增融资项目观察模块的部署和验收见 [RootData 接入](rootdata.md)。模块迁移只新增自己的表；升级保留原有新闻与信源。RootData 凭据仅配置到后端，确认额度后再打开 `ROOTDATA_ENABLED`。
+
 ## 用 Docker（推荐）
 
 需要一台装了 Docker（带 Compose）的机器。云服务器建议至少 2 核、4 GB 内存，构建镜像时要用到。
