@@ -2,5 +2,6 @@
 import type { ServerModule } from "@aihot/backend/modules";
 
 import okxNews from '@aihot/okx-news/server';
+import rootdata from '@aihot/rootdata/server';
 
-export const SERVER_MODULES: readonly ServerModule[] = [okxNews];
+export const SERVER_MODULES: readonly ServerModule[] = [okxNews, rootdata];
