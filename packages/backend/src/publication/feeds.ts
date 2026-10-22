@@ -32,8 +32,8 @@ const CACHE = { edgeCacheSeconds: 300 };
 const LEFT_OUT = [...FEED_COPY.allLeavesOut, "未审内容", "低相关条目", "已合并重复条目"];
 
 const FEEDS: FeedMeta[] = [
-  { id: "selected", path: "/feed.xml", title: `${SITE.name} — 精选`, description: `最新 50 条 ${SITE.name} 精选摘要，保留标题、站内阅读与原文入口；需要阅读器内全文可改订 /feed/full.xml。`, homePath: "/", pollHintMinutes: 30, ...CACHE },
-  { id: "selected-full", path: "/feed/full.xml", title: `${SITE.name} — 精选全文`, description: "与精选摘要相同的最新 50 条；仅对明确允许再分发的来源内联正文，其余仍提供摘要和阅读入口。", homePath: "/", pollHintMinutes: 30, ...CACHE },
+  { id: "selected", path: "/feed.xml", title: `${SITE.name} — 精选`, description: `最新 50 条 ${SITE.name} 精选摘要，保留标题、站内阅读与原文入口；需要阅读器内全文可改订 /feed/full.xml。`, homePath: "/featured", pollHintMinutes: 30, ...CACHE },
+  { id: "selected-full", path: "/feed/full.xml", title: `${SITE.name} — 精选全文`, description: "与精选摘要相同的最新 50 条；仅对明确允许再分发的来源内联正文，其余仍提供摘要和阅读入口。", homePath: "/featured", pollHintMinutes: 30, ...CACHE },
   { id: "all", path: "/feed/all.xml", title: `${SITE.name} — ${subjectAfter("全部", "动态")}`, description: `最近 7 天公开动态，按真实发布时间倒序；不含${LEFT_OUT.slice(0, -1).join("、")}和${LEFT_OUT.at(-1)}。`, homePath: "/all", pollHintMinutes: 30, ...CACHE },
   { id: "daily", path: "/feed/daily.xml", title: `${SITE.name} 日报`, description: `${SITE.name} ${EDITION_WHEN.daily}（北京时间）发布的精编日报，保留最近 30 期。`, homePath: "/daily", pollHintMinutes: 30, ...CACHE },
   { id: "weekly", path: "/feed/weekly.xml", title: `${SITE.name} 周报`, description: `${SITE.name} ${EDITION_WHEN.weekly}（北京时间）发布的周报：从上周每天的日报里选出的${REPORTS.entry.noun}，按栏目分好，附总述；保留最近 12 期。`, homePath: "/weekly", pollHintMinutes: 180, ...CACHE },
@@ -184,7 +184,7 @@ export async function itemFeed(kind: ItemFeedKind, category: PublicApiCategoryKe
       description: includeContent
         ? `${SITE.name} 每日精选「${label}」分类全文源。仅对明确允许再分发的来源内联正文。`
         : `${SITE.name} 每日精选里「${label}」这一类的摘要，按分类订阅、不被全量精选刷屏。`,
-      homePath: "/",
+      homePath: "/featured",
       selfPath: includeContent ? `/feed/full/category/${category}.xml` : `/feed/category/${category}.xml`,
       ttl: m.pollHintMinutes,
     };

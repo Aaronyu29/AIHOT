@@ -9,7 +9,7 @@ let web: WebServer;
 const upstreamPaths: string[] = [];
 const api = fakeApi((url, _res, req) => {
   upstreamPaths.push(req.url ?? "");
-  if (url.pathname === "/api/site/timeline") return { cards: [], nextCursor: null, dayCounts: {}, hot: [], filters: { category: null, channel: null, tag: null } };
+  if (url.pathname === "/api/site/pool") return { items: [], page: 1, pageCount: 1, total: 0, todayCount: 0, freshness: "2026-10-04T08:00:00Z", filters: { category: null, channel: "all", tag: null, q: null, tab: "time" } };
 });
 
 before(async () => { web = await startWebServer(api); });

@@ -7,7 +7,7 @@ import { after, test } from "node:test";
 import { config } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import { QUEUES, stopBoss } from "@aihot/backend/jobs/queue";
-import { collectSource } from "@aihot/backend/sources/collect";
+import { adaptIntervals, collectSource } from "@aihot/backend/sources/collect";
 
 const T = tag();
 const channel = `ProjectNews${T}`;
@@ -126,4 +126,20 @@ for (const kind of ["web_list", "json_list"] as const) test(`${kind} summary-onl
   assert.ok(jobs.every(job => job.name !== QUEUES.extractBody), "the collector must not schedule full-text extraction");
   assert.ok(!requested.some(path => path.startsWith("/must-not-fetch/")));
   assert.equal((await collectSource(id, { force: true })).created, 0);
+});
+
+test("daily adaptation preserves configured Telegram polling while ordinary RSS still adapts", async () => {
+  const fiveMinutes = await createSource("telegram-five-minutes", "web_list", { url: `${base}/s/FastProjectNews`, adapter: "telegram_public" });
+  const fifteenMinutes = await createSource("telegram-fifteen-minutes", "web_list", { url: `${base}/s/RootDataNews`, adapter: "telegram_public" });
+  const ordinaryFeed = await createSource("adaptive-rss", "rss", { feedUrl: `${base}/ordinary-feed.xml` });
+  await sql`UPDATE sources SET interval_minutes=5 WHERE id IN (${fiveMinutes},${ordinaryFeed})`;
+  await sql`UPDATE sources SET interval_minutes=15 WHERE id=${fifteenMinutes}`;
+
+  await adaptIntervals();
+
+  const rows = await sql`SELECT id,interval_minutes FROM sources WHERE id IN (${fiveMinutes},${fifteenMinutes},${ordinaryFeed})`;
+  const intervals = new Map(rows.map(row => [row.id, row.interval_minutes]));
+  assert.equal(intervals.get(fiveMinutes), 5, "a quiet Telegram channel retains the administrator's five-minute scan");
+  assert.equal(intervals.get(fifteenMinutes), 15, "a separately configured fifteen-minute channel also keeps its interval");
+  assert.equal(intervals.get(ordinaryFeed), 60, "ordinary low-volume RSS still receives the existing hourly target");
 });

@@ -523,6 +523,8 @@ export async function adaptIntervals(): Promise<{ updated: number }> {
     FROM sources s WHERE s.enabled AND s.kind IN ('rss', 'web_list', 'json_list', 'x_search')`;
   let updated = 0;
   for (const r of rows) {
+    // Public Telegram polling follows the administrator's interval, including sub-15-minute scans.
+    if (r.kind === "web_list" && r.config.adapter === "telegram_public") continue;
     const perDay = Number(r.per_day);
     // Editorial sites and feeds are looked at hourly at least (they cost nothing);
     // editorial X and listings read through Jina stop at two hours (paid per call, within their budgets);

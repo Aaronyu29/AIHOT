@@ -19,11 +19,11 @@ const api = fakeApi(async (url, res, req) => {
     while (metaAfterDeadline && Date.now() < deadline * 1000 + 50) await new Promise((resolve) => setTimeout(resolve, deadline * 1000 + 50 - Date.now()));
     return { changelogVersion: "2026-09-28T12:00" };
   }
-  if (url.pathname === "/api/site/timeline") {
+  if (url.pathname === "/api/site/pool") {
     const filters = { channel: "all", category: url.searchParams.get("category"), tag: null };
     res.setHeader("X-Accel-Expires", `@${deadline}`);
     res.setHeader("Cache-Control", "public, max-age=30, s-maxage=30");
-    return { filters, cards: [], nextCursor: null, dayCounts: [], hot: null };
+    return { filters: { ...filters, q: null, tab: "time" }, items: [], page: 1, pageCount: 1, total: 0, todayCount: 0, freshness: new Date(deadline * 1000).toISOString() };
   }
   if (url.pathname === "/api/site/hot") return { entries: [] };
   if (url.pathname === "/api/site/echo-client") return { forwarded: req.headers["x-forwarded-for"], real: req.headers["x-real-ip"] };
@@ -52,14 +52,14 @@ before(async () => {
 after(() => web.stop());
 
 test("public route subsets produce the same complete navigation data; filters still differ", async () => {
-  const answers = await Promise.all(["", "?_routes=root", "?_routes=routes%2Fhome", "?_routes=unknown"].map(async (query) => {
+  const answers = await Promise.all(["", "?_routes=root", "?_routes=routes%2Findex", "?_routes=unknown"].map(async (query) => {
     const res = await fetch(`${origin}/_.data${query}`);
     assert.equal(res.status, 200);
     assert.match(res.headers.get("Cache-Control")!, /^public,/);
     assert.equal(res.headers.get("X-Accel-Expires"), `@${deadline}`);
     assert.doesNotMatch(res.headers.get("Cache-Control")!, /stale/);
     const body = await res.text();
-    assert.ok(body.includes("root") && body.includes("routes/home"));
+    assert.ok(body.includes("root") && body.includes("routes/index"));
     return body;
   }));
   assert.ok(answers.every((body) => body === answers[0]));
@@ -107,7 +107,7 @@ test("missing routes cannot be hidden by a root-only request; errors and redirec
     assert.equal(res.headers.get("X-Accel-Expires"), "0");
     await res.text();
   }
-  for (const [pathname, target] of [["/story/merged.data?_routes=root", "/story/surviving-story"], ["/_.data?q=search&_routes=root", "/all?q=search"]]) {
+  for (const [pathname, target] of [["/story/merged.data?_routes=root", "/story/surviving-story"], ["/featured.data?q=search&_routes=root", "/all?q=search"]]) {
     const res = await fetch(origin + pathname);
     assert.equal(res.status, 202);
     assert.equal(res.headers.get("Cache-Control"), "private, no-store");
@@ -132,7 +132,7 @@ test("browser freshness shares the selected deadline, including slow sibling loa
   const savedDeadline = deadline;
   try {
     deadline = Math.floor(Date.now() / 1000) + 20;
-    for (const pathname of ["/", "/_.data?_routes=routes%2Fhome"]) {
+    for (const pathname of ["/", "/_.data?_routes=routes%2Findex"]) {
       const res = await fetch(origin + pathname);
       const cc = res.headers.get("Cache-Control")!;
       const browser = Number(cc.match(/(?:^|,)\s*max-age=(\d+)/)![1]);
@@ -148,7 +148,7 @@ test("browser freshness shares the selected deadline, including slow sibling loa
     // finishes after it.
     deadline = Math.floor(Date.now() / 1000) + 2;
     metaAfterDeadline = true;
-    await Promise.all(["/", "/_.data?_routes=routes%2Fhome"].map(async (pathname) => {
+    await Promise.all(["/", "/_.data?_routes=routes%2Findex"].map(async (pathname) => {
       const res = await fetch(origin + pathname);
       assert.equal(res.status, 200);
       assert.equal(res.headers.get("Cache-Control"), "no-cache");
