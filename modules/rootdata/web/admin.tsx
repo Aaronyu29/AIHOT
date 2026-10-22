@@ -46,12 +46,12 @@ function ReviewProject({ project }: { project: FundingAdminProject }) {
     {project.lastError && <p className="mt-2 break-words rounded-control bg-amber-soft px-3 py-2 text-[12px] text-amber-ink">最近同步提示：{project.lastError}</p>}
     <form onSubmit={save} className="mt-4 space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1 text-[12.5px] text-ink-3"><span>项目名称</span><Input required maxLength={200} value={name} onChange={(event) => setName(event.target.value)} /></label>
+        <label className="space-y-1 text-[12.5px] text-ink-3"><span>项目名称</span><Input required minLength={2} maxLength={80} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="space-y-1 text-[12.5px] text-ink-3"><span>RootData 项目 ID（选填）</span><Input type="number" inputMode="numeric" min={1} step={1} value={rootdataId} placeholder="未匹配时可手动核对后填写" onChange={(event) => setRootdataId(event.target.value)} /></label>
         <label className="space-y-1 text-[12.5px] text-ink-3"><span>审核状态</span><Select aria-label="审核状态" value={reviewStatus} onChange={(event) => setReviewStatus(event.target.value as FundingAdminProject["reviewStatus"])}>{Object.entries(REVIEW_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>
         <label className="space-y-1 text-[12.5px] text-ink-3"><span>跟踪状态</span><Select aria-label="跟踪状态" value={trackingStatus} onChange={(event) => setTrackingStatus(event.target.value as FundingAdminProject["trackingStatus"])}><option value="watching">持续跟踪</option><option value="paused">暂停跟踪与展示</option></Select></label>
       </div>
-      <label className="block space-y-1 text-[12.5px] text-ink-3"><span>公开跟踪依据</span><Textarea rows={2} maxLength={1000} value={publicReason} onChange={(event) => setPublicReason(event.target.value)} placeholder="只填写能够由上述来源核对的理由" /></label>
+      <label className="block space-y-1 text-[12.5px] text-ink-3"><span>公开跟踪依据</span><Textarea rows={2} maxLength={500} value={publicReason} onChange={(event) => setPublicReason(event.target.value)} placeholder="只填写能够由上述来源核对的理由" /></label>
       <label className="block space-y-1 text-[12.5px] text-ink-3"><span>本次操作说明（仅后台）</span><Input required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="说明核对了哪些来源，或为什么修改、排除、暂停" /></label>
       <p className="text-[11.5px] leading-relaxed text-ink-4">核对通过且有有效融资报道的项目才会公开。修改项目名称会重新核对档案；填写 ID 前请确认属于同一个项目。档案由后台定期同步。</p>
       {error && <p role="alert" className="text-[12.5px] text-hot">{error}</p>}
