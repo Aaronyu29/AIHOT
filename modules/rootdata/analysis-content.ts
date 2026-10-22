@@ -35,16 +35,18 @@ export function validateAnalysis(value: unknown, project: FundingProject): Analy
   const output = AnalysisSchema.parse(value);
   const sources = analysisSources(project);
   const normalize = (s: string) => s.normalize('NFKC').replace(/\s+/g, ' ').trim();
+  if (output.chainAssessment.kind === 'assessment') throw new Error('Deployment chain must be confirmed by evidence or unknown');
   for (const claim of [output.whatItDoes, output.chainAssessment, output.promotionAssessment, output.outlook, ...output.opportunities, ...output.risks]) {
     if (claim.kind === 'fact' && claim.citations.length === 0) throw new Error('A project fact has no supporting citation');
-    if (claim.kind !== 'unknown' && claim.citations.length === 0) throw new Error('A project assessment has no supporting citation');
+    // A model sometimes labels an evidence gap as an assessment; keep it visibly unconfirmed.
+    if (claim.kind === 'assessment' && claim.citations.length === 0) claim.kind = 'unknown';
     for (const citation of claim.citations) {
       const source = sources.get(citation.sourceId);
       if (!source || normalize(citation.quote).length < 6 || !normalize(source).includes(normalize(citation.quote))) throw new Error('Project analysis citation is not in the provided evidence');
     }
   }
   if (output.outlook.kind === 'fact') throw new Error('Project outlook is a judgement, not a verified fact');
-  if (output.chainAssessment.kind === 'assessment') throw new Error('Deployment chain must be confirmed by evidence or unknown');
+
   if (output.opportunities.some(c => c.kind === 'fact')) throw new Error('Future opportunities must be labelled as assessments');
   if (sources.size < 3) output.confidence = 'low';
   return output;

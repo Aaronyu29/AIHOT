@@ -11,6 +11,9 @@ test('analysis accepts traceable quotes, explicit unknown chain and conditional 
   const validated = validateAnalysis(output, project);
   assert.equal(validated.confidence, 'low', 'few sources cannot yield high confidence');
   assert.equal(validated.chainAssessment.kind, 'unknown');
+  const missing = validateAnalysis({...output, risks: [{...assessment, citations: []}]}, project);
+  assert.equal(missing.risks[0].kind, 'unknown', 'a missing citation cannot be presented as a supported assessment');
+  assert.equal(assessment.kind, 'assessment', 'validation does not mutate provider input');
 });
 test('analysis rejects invented sources, altered quotes and unsupported facts', () => {
   assert.throws(() => validateAnalysis({...output, whatItDoes: [output.whatItDoes]}, project), /expected object/);
