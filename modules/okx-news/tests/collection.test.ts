@@ -21,6 +21,7 @@ test('incremental collection rotates projects, deduplicates, resumes pages and p
  assert.equal(bodies.length,2);assert.ok(bodies.every(a=>a.body_status==='none'&&a.body_text===null));
  const extraction=await sql`SELECT count(*) AS n FROM pgboss.job WHERE name='content.extract' AND data->>'articleId' IN ${sql(bodies.map(a=>a.id))}`;
  assert.equal(Number(extraction[0].n),0);
+ await sql`UPDATE sources SET cursor=jsonb_set(cursor,'{coveredTo}',to_jsonb((cursor->>'coveredTo')::bigint-3600000)) WHERE id=${SOURCE_ID}`;
  let failedPath='';
  const failed=await collectNews(true,async(path,key)=>{failedPath=path;assert.equal(key.key,'test-a');throw new NewsApiError(429,'rate_limit');});
  assert.equal(failed.status,'failed');
