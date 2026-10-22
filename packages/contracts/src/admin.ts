@@ -67,6 +67,36 @@ export interface AdminAudit {
 export const REPLACEABLE_SOURCE_KINDS = ["rss", "web_list", "json_list"] as const;
 export type ReplaceableSourceKind = typeof REPLACEABLE_SOURCE_KINDS[number];
 
+export const SOURCE_QUALITY_WINDOWS = [7, 30, 90] as const;
+export type SourceQualityWindow = typeof SOURCE_QUALITY_WINDOWS[number];
+export const SOURCE_QUALITY_SORTS = ["health", "low-effective", "high-duplicate", "low-selected", "unstable"] as const;
+export type SourceQualitySort = typeof SOURCE_QUALITY_SORTS[number];
+
+/** Current outcomes for articles received in one discovery-time cohort. Rates are fractions, not percentages. */
+export interface AdminSourceQuality {
+  received: number;
+  processed: number;
+  effective: number;
+  blocked: number;
+  pending: number;
+  failed: number;
+  backfill: number;
+  pendingGrouping: number;
+  selectionEvaluated: number;
+  selected: number;
+  duplicateEvaluated: number;
+  duplicates: number;
+  fetchOk: number;
+  fetchFailed: number;
+  fetchRunning: number;
+  budgetSkipped: number;
+  fetchP95Ms: number | null;
+  effectiveRate: number | null;
+  selectedRate: number | null;
+  duplicateRate: number | null;
+  fetchSuccessRate: number | null;
+}
+
 export interface AdminSourceUpdate {
   patch: Partial<Pick<AdminSource, "name" | "enabled" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext" | "syndicate_fulltext" | "tags">> & (
     { kind?: never; config?: Record<string, unknown> } | { kind: ReplaceableSourceKind; config: Record<string, unknown> }
@@ -90,12 +120,15 @@ export interface AdminSourceRow {
   last_error: string | null;
   first_party: boolean;
   next_fetch_at: Timestamp | null;
-  items_7d: number;
-  selected_30d: number;
+  quality: AdminSourceQuality;
 }
 
 export interface AdminSources {
   page: number;
+  windowDays: SourceQualityWindow;
+  observedAt: Timestamp;
+  sort: SourceQualitySort;
+  matchedTotal: number;
   rows: AdminSourceRow[];
   totals: { total: number; enabled: number; failing: number; degraded: number };
 }

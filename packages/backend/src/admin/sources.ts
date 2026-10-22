@@ -2,8 +2,8 @@
 // duplicate checks, pause/resume and manual collection. Every change is audited.
 import { z } from "zod";
 import { SOURCE_DEFAULTS } from "@aihot/site";
-import type { AdminSource, AdminSourceCreated, AdminSourceDetail, AdminSourcePreview, AdminSourceRow, AdminSources, BeforeJson } from "@aihot/contracts/admin";
-import { REPLACEABLE_SOURCE_KINDS } from "@aihot/contracts/admin";
+import type { AdminSource, AdminSourceCreated, AdminSourceDetail, AdminSourcePreview, AdminSourceRow, AdminSources, BeforeJson, SourceQualitySort } from "@aihot/contracts/admin";
+import { REPLACEABLE_SOURCE_KINDS, SOURCE_QUALITY_SORTS } from "@aihot/contracts/admin";
 import { audit, auditHistory, Conflict } from "../audit.ts";
 import { groupingReset } from "../content/provenance.ts";
 import { sql, type Db } from "../db.ts";
@@ -22,6 +22,7 @@ import { FetchError, type Candidate, type SourceRow } from "../sources/types.ts"
 import { fetchWebList } from "../sources/web-list.ts";
 import { fetchXSearch } from "../sources/x.ts";
 import { xHandle } from "../sources/account.ts";
+import { sourceQuality } from "./source-quality.ts";
 
 
 export interface SourceListFilters {
@@ -31,34 +32,44 @@ export interface SourceListFilters {
   enabled?: "true" | "false";
   mode?: string;
   page?: number;
+  window?: number;
+  sort?: SourceQualitySort;
 }
 
 export async function listSources(f: SourceListFilters): Promise<BeforeJson<AdminSources>> {
   const page = Math.max(1, f.page ?? 1);
+  const windowDays = z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30).parse(f.window);
+  const sort = z.enum(SOURCE_QUALITY_SORTS).default("health").parse(f.sort);
+  const observedAt = new Date();
   const q = f.q?.trim() ? `%${f.q.trim()}%` : null;
-  const [rows, [totals]] = await Promise.all([
-    sql<BeforeJson<AdminSourceRow>[]>`
+  const [matched, [totals]] = await Promise.all([
+    sql<Omit<BeforeJson<AdminSourceRow>, "quality">[]>`
     SELECT s.id, s.name, s.kind, s.tier, s.participation_mode, s.enabled, s.health, s.fail_count, s.interval_minutes,
-           s.last_ok_at, s.last_fetch_at, s.last_error, (s.tier = 'T1') AS first_party, s.next_fetch_at,
-           (SELECT count(*)::int FROM articles a WHERE a.source_id = s.id AND a.discovered_at > now() - interval '7 days') AS items_7d,
-           (SELECT count(*)::int FROM publications p WHERE p.source_id = s.id AND p.selected AND p.discovered_at > now() - interval '30 days') AS selected_30d
-    FROM (
-      SELECT * FROM sources
+           s.last_ok_at, s.last_fetch_at, s.last_error, (s.tier = 'T1') AS first_party, s.next_fetch_at
+    FROM sources s
       WHERE (${q}::text IS NULL OR name ILIKE ${q} OR id ILIKE ${q} OR config::text ILIKE ${q})
         AND (${f.kind ?? null}::text IS NULL OR kind = ${f.kind ?? null})
         AND (${f.health ?? null}::text IS NULL OR health = ${f.health ?? null})
         AND (${f.mode ?? null}::text IS NULL OR participation_mode = ${f.mode ?? null})
         AND (${f.enabled ?? null}::text IS NULL OR enabled = (${f.enabled ?? null} = 'true'))
-      ORDER BY enabled DESC, CASE health WHEN 'failing' THEN 0 WHEN 'degraded' THEN 1 ELSE 2 END, name, id
-      LIMIT 100 OFFSET ${(page - 1) * 100}
-    ) s
     ORDER BY s.enabled DESC, CASE s.health WHEN 'failing' THEN 0 WHEN 'degraded' THEN 1 ELSE 2 END, s.name, s.id`,
     sql<{ total: number; enabled: number; failing: number; degraded: number }[]>`
     SELECT count(*)::int AS total, count(*) FILTER (WHERE enabled)::int AS enabled,
            count(*) FILTER (WHERE health = 'failing')::int AS failing, count(*) FILTER (WHERE health = 'degraded')::int AS degraded
     FROM sources`,
   ]);
-  return { page, rows, totals };
+  const quality = await sourceQuality(matched.map(row => row.id), windowDays, observedAt);
+  const rows = matched.map(row => ({ ...row, quality: quality.get(row.id)! }));
+  if (sort !== "health") {
+    const field = { "low-effective": "effectiveRate", "high-duplicate": "duplicateRate", "low-selected": "selectedRate", unstable: "fetchSuccessRate" }[sort] as "effectiveRate" | "duplicateRate" | "selectedRate" | "fetchSuccessRate";
+    rows.sort((a, b) => {
+      const left = a.quality[field], right = b.quality[field];
+      // No sample is unknown, so it follows measured sources instead of looking artificially poor.
+      const metric = left === null ? right === null ? 0 : 1 : right === null ? -1 : (left - right) * (sort === "high-duplicate" ? -1 : 1);
+      return metric || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+    });
+  }
+  return { page, rows: rows.slice((page - 1) * 100, page * 100), totals, matchedTotal: rows.length, windowDays, observedAt, sort };
 }
 
 export async function sourceDetail(id: string): Promise<BeforeJson<AdminSourceDetail> | null> {
