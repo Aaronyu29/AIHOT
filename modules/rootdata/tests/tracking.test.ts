@@ -91,6 +91,22 @@ test("pending and rejected candidates receive new public updates for automatic r
   }
 });
 
+test("a corrected financing report retains its reviewed canonical project identity", async () => {
+  const canonical = `Canonical${tag()}`;
+  const extracted = `Investor backed ${canonical}`;
+  const item = await candidate(extracted);
+  await updateFundingProject(item.id, {version: item.version, name: canonical, reason: "Corrected the financing entity"}, "test-admin");
+  await sql`UPDATE publications SET summary='Updated details about the financing and developer product.', revision=revision+1
+    WHERE article_id=${item.articleId}`;
+  await discoverFundingCandidates();
+  const projects = await sql`SELECT id,name FROM rootdata_projects WHERE name IN (${canonical},${extracted})`;
+  assert.deepEqual(projects.map(p=>({id:p.id,name:p.name})), [{id:item.id,name:canonical}]);
+  const [link] = await sql`SELECT e.kind,e.publication_revision,p.revision FROM rootdata_evidence e
+    JOIN publications p ON p.article_id=e.article_id WHERE e.project_id=${item.id} AND e.article_id=${item.articleId}`;
+  assert.equal(link!.kind, "funding");
+  assert.equal(link!.publication_revision, link!.revision);
+});
+
 test("Basic enrichment reuses durable receipts and respects the seven day refresh", async () => {
   await sql`UPDATE rootdata_projects SET next_refresh_at = now() + interval '8 days'`;
   const item = await candidate(`Cache${tag()}`);

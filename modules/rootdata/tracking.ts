@@ -92,10 +92,10 @@ export async function discoverFundingCandidates(now = new Date()): Promise<{ sca
       const name = fundingCandidateName(report.title) ?? fundingCandidateName(report.originalTitle);
       const targets = new Map<number, "funding" | "update">();
       if (name) {
-        // A reviewed name correction belongs to this unchanged report; rediscovery must not
-        // recreate the old spelling as a second candidate on every scheduled run.
+        // Keep the candidate identity across corrections to this report. The changed public
+        // evidence invalidates its automatic approval and triggers a fresh model review.
         const [existing] = await sql<{ id: number }[]>`SELECT project_id AS id FROM rootdata_evidence
-          WHERE article_id = ${report.articleId} AND publication_revision = ${report.revision} AND kind = 'funding' LIMIT 1`;
+          WHERE article_id = ${report.articleId} AND kind = 'funding' ORDER BY project_id LIMIT 1`;
         const row = existing ?? (await sql<{ id: number }[]>`INSERT INTO rootdata_projects (name, name_key)
           VALUES (${name}, ${normalizedProjectName(name)}) ON CONFLICT (name_key) DO UPDATE SET name_key = EXCLUDED.name_key RETURNING id`)[0]!;
         targets.set(row!.id, "funding");

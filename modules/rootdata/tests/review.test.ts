@@ -180,3 +180,34 @@ test('unknown provider outcomes remain fenced after the retry delay', async t =>
   assert.equal(receipt.status, 'unknown');
   assert.equal(receipt.attempts, 1);
 });
+
+test('invalid model evidence backs off then recovers automatically, and the service budget still stops new requests', async t => {
+  t.mock.method(console, 'error', () => {});
+  const item = await create(`Recovery${tag()}`);
+  const remote = await stub((hit, req) => {
+    const user = JSON.parse(JSON.parse(req.body).messages[1].content);
+    const response = answer(user).data;
+    if (hit === 1) response.citations[0]!.quote = 'Invented financing evidence not in the source';
+    return {id: `review-recovery-${hit}`, choices: [{message: {content: JSON.stringify(response)}}]};
+  });
+  t.after(remote.close);
+  installModules([rootdataServer]);
+  process.env.ROOTDATA_REVIEW_MODEL='deepseek-flash';
+  pointModels(remote.url, ['deepseek-flash']);
+  assert.equal((await reviewFundingProjects()).failed, 1);
+  assert.ok((await view(item.id)).autoReviewError);
+  assert.equal(await fundingProject(item.id), null);
+  await reviewFundingProjects();
+  assert.equal(remote.hits(), 1, 'the failure delay prevents immediate repeated spending');
+  await sql`UPDATE rootdata_reviews SET next_attempt_at=now()-interval '1 minute' WHERE project_id=${item.id}`;
+  assert.equal((await reviewFundingProjects()).updated, 1);
+  assert.equal(remote.hits(), 2);
+  assert.ok(await fundingProject(item.id));
+  assert.equal((await view(item.id)).autoReviewError, null);
+  await sql`INSERT INTO budgets (service,per_minute,per_hour,per_day) VALUES ('deepseek',0,0,0)
+    ON CONFLICT (service) DO UPDATE SET per_minute=0,per_hour=0,per_day=0`;
+  const limited = await create(`Budget${tag()}`);
+  assert.equal((await reviewFundingProjects()).failed, 1);
+  assert.equal(remote.hits(), 2, 'review cannot bypass the existing provider budget');
+  assert.equal(await fundingProject(limited.id), null);
+});

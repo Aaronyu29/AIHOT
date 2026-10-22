@@ -37,7 +37,7 @@ export function validateReview(value: unknown, project: FundingProject): ReviewO
     }
   }
   const funding = new Set(project.evidence.filter(e => e.kind === 'funding').map(e => e.articleId));
-  if (output.canonicalName !== null && (!output.nameCitation || !funding.has(output.nameCitation.sourceId)
+  if (output.canonicalName !== null && (!output.identityMatched || !output.nameCitation || !funding.has(output.nameCitation.sourceId)
     || !mentionsProject(output.nameCitation.quote, output.canonicalName))) {
     throw new Error('Canonical project name is not supported by a funding citation');
   }
