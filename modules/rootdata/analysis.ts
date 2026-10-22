@@ -13,14 +13,14 @@ const analyze: AnalysisModel = async project => chatJson({
   schema: AnalysisSchema, temperature: 0.2, maxTokens: 3500,
 });
 
-export async function analyzeFundingProjects(ask: AnalysisModel = analyze): Promise<{updated: number; failed: number; skipped?: string}> {
-  if (process.env.MODEL_CALLS_ENABLED !== 'true') return {updated: 0, failed: 0, skipped: 'models_disabled'};
+export async function analyzeFundingProjects(ask: AnalysisModel = analyze): Promise<{status: 'ok' | 'failed' | 'skipped'; updated: number; failed: number; skipped?: string}> {
+  if (process.env.MODEL_CALLS_ENABLED !== 'true') return {status: 'skipped', updated: 0, failed: 0, skipped: 'models_disabled'};
   const connection = await sql.reserve();
   let locked = false;
   let updated = 0, failed = 0;
   try {
     [ {locked} ] = await connection<{locked: boolean}[]>`SELECT pg_try_advisory_lock(hashtext('rootdata.analysis')) AS locked`;
-    if (!locked) return {updated, failed, skipped: 'already_running'};
+    if (!locked) return {status: 'skipped', updated, failed, skipped: 'already_running'};
     const rows = await sql<ProjectRow[]>`SELECT p.* FROM rootdata_projects p LEFT JOIN rootdata_analyses a ON a.project_id = p.id
       WHERE p.review_status = 'approved' AND p.tracking_status = 'watching'
         AND (a.next_attempt_at IS NULL OR a.next_attempt_at <= now())
@@ -67,7 +67,7 @@ export async function analyzeFundingProjects(ask: AnalysisModel = analyze): Prom
         await sql`UPDATE rootdata_analyses SET last_error = '分析暂未完成；请检查模型运行回执与预算，稍后重试' WHERE project_id = ${project.id}`;
       }
     }
-    return {updated, failed};
+    return {status: failed ? 'failed' : 'ok', updated, failed};
   } finally {
     try {
       if (locked) await connection`SELECT pg_advisory_unlock(hashtext('rootdata.analysis'))`;

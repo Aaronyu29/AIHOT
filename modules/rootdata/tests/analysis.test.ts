@@ -2,6 +2,7 @@ import '../../../tests/setup.ts';
 import {test, after} from 'node:test';
 import assert from 'node:assert/strict';
 import {sql, closeDb} from '@aihot/backend/db';
+import {recordRun} from '@aihot/backend/jobs/queue';
 import {analyzeFundingProjects, type AnalysisModel} from '../analysis.ts';
 import {fundingProject} from '../publication.ts';
 import {discoverFundingCandidates, updateFundingProject} from '../tracking.ts';
@@ -45,12 +46,14 @@ test('one failed project logs its cause and does not block the next analysis', a
   const failed = await create('AnalysisFailed');
   const next = await create('AnalysisNext');
   const logs = t.mock.method(console, 'error', () => {});
-  const result = await analyzeFundingProjects(async project => {
+  const result = await recordRun('rootdata.analysis', () => analyzeFundingProjects(async project => {
     if (project.id === failed.id) throw new Error('synthetic model transport failure');
     return answer(project);
-  });
+  }));
   assert.equal(result.failed, 1);
   assert.equal(result.updated, 1);
+  const [run] = await sql`SELECT status FROM job_runs WHERE job='rootdata.analysis' ORDER BY id DESC LIMIT 1`;
+  assert.equal(run.status, 'failed');
   assert.ok((await fundingProject(next.id))?.analysis);
   const entry = logs.mock.calls.map(c => JSON.parse(String(c.arguments[0]))).find(e => e.projectId === failed.id);
   assert.equal(entry.job, 'rootdata.analysis');assert.equal(entry.stage, 'model');

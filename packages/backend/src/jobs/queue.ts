@@ -196,9 +196,10 @@ export async function recordRun<T>(job: string, fn: () => Promise<T>): Promise<T
     runId = row!.id;
     const result = await fn();
     const detail = result && typeof result === "object" ? result : { result };
-    const reportedFailure = result !== null && typeof result === "object" && "status" in result && result.status === "failed";
+    const status = result !== null && typeof result === "object" && "status" in result ? result.status : null;
+    const reportedFailure = status === "failed";
     const error = reportedFailure ? "Task reported failure; inspect detail and correlated worker errors" : null;
-    await sql`UPDATE job_runs SET status = ${reportedFailure ? "failed" : "ok"}, finished_at = now(), detail = ${sql.json(detail as never)}, error = ${error} WHERE id = ${runId}`;
+    await sql`UPDATE job_runs SET status = ${reportedFailure ? "failed" : status === "skipped" ? "skipped" : "ok"}, finished_at = now(), detail = ${sql.json(detail as never)}, error = ${error} WHERE id = ${runId}`;
     if (reportedFailure) logTaskError(new Error(error!), { msg: "scheduled task reported failure", job, runId, elapsedMs: Math.round(performance.now() - started) });
     return result;
   } catch (error) {
