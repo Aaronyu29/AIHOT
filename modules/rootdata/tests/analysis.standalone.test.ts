@@ -13,6 +13,7 @@ test('analysis accepts traceable quotes, explicit unknown chain and conditional 
   assert.equal(validated.chainAssessment.kind, 'unknown');
 });
 test('analysis rejects invented sources, altered quotes and unsupported facts', () => {
+  assert.throws(() => validateAnalysis({...output, whatItDoes: [output.whatItDoes]}, project), /expected object/);
   assert.throws(() => validateAnalysis({...output, whatItDoes: {...output.whatItDoes, citations: [{sourceId: 'invented', quote: 'Sample provides a data network.'}]}}, project), /citation/);
   assert.throws(() => validateAnalysis({...output, whatItDoes: {...output.whatItDoes, citations: [{sourceId: 'rootdata', quote: 'Sample runs on Ethereum.'}]}}, project), /citation/);
   assert.throws(() => validateAnalysis({...output, whatItDoes: {...output.whatItDoes, citations: []}}, project), /citation/);
