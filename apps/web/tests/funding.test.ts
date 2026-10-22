@@ -22,11 +22,20 @@ const project: FundingProject = {
     opportunities: [], risks: [], watchSignals: ["测试网开发者的实际使用情况"],
   },
 };
-const review: FundingAdminProject = { ...project, reviewStatus: "pending", version: 4, rootdataId: 217, publicReason: project.reasons[0], lastError: null };
+const review: FundingAdminProject = { ...project, reviewStatus: "pending", version: 4, rootdataId: 217, publicReason: project.reasons[0], lastError: null, autoReview: null };
+const reviews: FundingAdminProject[] = [review,
+  { ...review, id: 18, name: "Atlas Fintech", reviewStatus: "approved", autoReview: { decision: "approve", reason: "融资用途明确，开发者产品已有可核对进展。", reviewedAt: "2026-10-22T02:17:00Z", model: "review-fixture" } },
+  { ...review, id: 19, name: "Delta Labs", autoReview: { decision: "defer", reason: "同名项目尚无法确认，等待更多公开资料。", reviewedAt: "2026-10-22T02:17:00Z", model: "review-fixture" } },
+  { ...review, id: 20, name: "Echo Protocol", reviewStatus: "rejected", autoReview: { decision: "reject", reason: "现有报道只提融资计划，尚未证实完成融资。", reviewedAt: "2026-10-22T02:17:00Z", model: "review-fixture" } },
+  { ...review, id: 21, name: "Paused Network", reviewStatus: "approved", trackingStatus: "paused", autoReview: { decision: "approve", reason: "研发方向值得继续观察，尚待后续使用数据。", reviewedAt: "2026-10-22T02:17:00Z", model: "review-fixture" } },
+  { ...review, id: 22, name: "Recheck Labs", autoReview: { decision: "approve", reason: "此前融资证据明确，可继续跟进产品进展。", reviewedAt: "2026-10-22T02:17:00Z", model: "review-fixture" } },
+];
 let submitted: FundingProjectPatch | undefined;
 const requests: string[] = [];
+const writes: string[] = [];
 const api = fakeApi(async (url, response, request) => {
   requests.push(url.pathname + url.search);
+  if (request.method !== "GET" && url.pathname.startsWith("/api/admin/funding-projects")) writes.push(request.method ?? "");
   if (url.pathname === "/api/site/funding-projects") {
     if (url.searchParams.get("q") === "empty") return { items: [], total: 0, notice: "RootData 仅提供项目基础档案，融资信息来自公开报道。" };
     return { items: [project], total: 25, notice: "RootData 仅提供项目基础档案，融资信息来自公开报道。" };
@@ -36,7 +45,7 @@ const api = fakeApi(async (url, response, request) => {
   if (url.pathname === "/api/site/funding-projects/503") { response.statusCode = 503; return { code: "unavailable" }; }
   if (url.pathname === "/api/admin/me") return { name: "Reviewer", csrf: "fixture-csrf", dev: true };
   if (url.pathname === "/api/admin/nav-counts") return {};
-  if (url.pathname === "/api/admin/funding-projects") return { items: [review], status: { enabled: false, configured: false, quota: null } };
+  if (url.pathname === "/api/admin/funding-projects") return { items: reviews, status: { enabled: false, configured: false, quota: null } };
   if (url.pathname === "/api/admin/funding-projects/17" && request.method === "PATCH") {
     assert.equal(request.headers["x-csrf-token"], "fixture-csrf");
     let body = "";
@@ -105,18 +114,50 @@ test("phone reader can follow projects, return to current updates and distinguis
   } finally { await context.close(); }
 });
 
-test("review form sends the checked project, version and audit reason with the admin session", async () => {
+test("admin exposes saved automatic decisions and evidence without requiring a manual approval", async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const beforeWrites = writes.length;
+  try {
+    await visit(page, `${web.origin}/admin/funding`);
+    for (const item of reviews) {
+      const card = page.getByRole("article", { name: item.name, exact: true });
+      await expect(card.getByRole("heading", { name: item.name, exact: true })).toBeVisible();
+      const result = card.getByRole("region", { name: `${item.name} 自动审核` });
+      if (item.autoReview) {
+        await expect(result.getByText(item.autoReview.reason, { exact: true })).toBeVisible();
+        await expect(result.getByText(`模型：${item.autoReview.model}`, { exact: true })).toBeVisible();
+        await expect(result.locator("time")).toHaveAttribute("datetime", item.autoReview.reviewedAt);
+      } else {
+        assert.equal(await result.locator("time").count(), 0);
+        await expect(result).toContainText(/等待自动审核/);
+      }
+      await expect(card.getByLabel("项目名称", { exact: true })).not.toBeVisible();
+      assert.equal(await card.locator(`a[href='/funding/${item.id}']`).count(), item.reviewStatus === "approved" && item.trackingStatus === "watching" ? 1 : 0);
+    }
+    await page.getByRole("button", { name: "候选项目", exact: true }).click();
+    await expect(page.getByRole("article", { name: "Delta Labs", exact: true })).toBeVisible();
+    assert.equal(await page.getByRole("article", { name: "Atlas Fintech", exact: true }).count(), 0);
+    assert.equal(writes.length, beforeWrites, "reading and filtering model results must not perform a review mutation");
+  } finally { await context.close(); }
+});
+
+test("optional adjustment sends project version and audit reason and retains the pause control", async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   try {
     await visit(page, `${web.origin}/admin/funding`);
-    await page.getByLabel("项目名称", { exact: true }).fill("Orbit Network");
-    await page.getByLabel("审核状态", { exact: true }).selectOption("approved");
-    await page.getByLabel("本次操作说明（仅后台）").fill("已核对项目官网与融资公告，为同一项目。");
-    await page.getByRole("button", { name: "保存审核结果" }).click();
+    const card = page.getByRole("article", { name: "Orbit Labs", exact: true });
+    await card.locator("summary").click();
+    await card.getByLabel("项目名称", { exact: true }).fill("Orbit Network");
+    await card.getByLabel("入选状态", { exact: true }).selectOption("approved");
+    await card.getByLabel("跟踪状态", { exact: true }).selectOption("paused");
+    await card.getByLabel("本次操作说明（仅后台）").fill("已核对项目官网与融资公告，为同一项目。");
+    await card.getByRole("button", { name: "保存调整" }).click();
     await expect.poll(() => submitted?.reviewStatus).toBe("approved");
     assert.equal(submitted?.version, 4);
     assert.equal(submitted?.name, "Orbit Network");
+    assert.equal(submitted?.trackingStatus, "paused");
     assert.equal(submitted?.rootdataId, undefined, "a renamed project must let the backend clear its previous profile mapping");
     assert.match(submitted?.reason ?? "", /已核对/);
   } finally { await context.close(); }
@@ -128,13 +169,25 @@ test("project pages and navigation fit phone and desktop in both themes", async 
     await context.addInitScript((value) => localStorage.setItem("aihot-theme", value), theme);
     const page = await context.newPage();
     try {
-      for (const path of ["/funding", "/funding/17"]) {
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      for (const path of ["/funding", "/funding/17", "/admin/funding"]) {
         await visit(page, `${web.origin}${path}`);
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `${path} at ${width}/${theme}`);
-        await expect(page.getByRole("button", { name: "关注 Orbit Labs", exact: true })).toBeVisible();
-        if (process.env.FUNDING_SCREENSHOTS_DIR) await page.screenshot({ path: `${process.env.FUNDING_SCREENSHOTS_DIR}/funding-${path.endsWith("17") ? "detail" : "list"}-${width}-${theme}.png`, fullPage: true });
+        if (path.startsWith("/admin")) {
+          await expect(page.getByRole("region", { name: "Atlas Fintech 自动审核" })).toBeVisible();
+          const card = page.getByRole("article", { name: "Orbit Labs", exact: true });
+          await card.locator("summary").click();
+          await expect(card.getByLabel("跟踪状态", { exact: true })).toBeVisible();
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `expanded controls at ${width}/${theme}`);
+        } else await expect(page.getByRole("button", { name: "关注 Orbit Labs", exact: true })).toBeVisible();
+        if (process.env.FUNDING_SCREENSHOTS_DIR) {
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.screenshot({ path: `${process.env.FUNDING_SCREENSHOTS_DIR}/funding-${path.startsWith("/admin") ? "admin" : path.endsWith("17") ? "detail" : "list"}-${width}-${theme}.png`, fullPage: true });
+        }
       }
+      assert.deepEqual(errors, [], "funding pages should hydrate without JavaScript errors");
     } finally { await context.close(); }
   }
 });

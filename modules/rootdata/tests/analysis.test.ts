@@ -6,6 +6,7 @@ import {recordRun} from '@aihot/backend/jobs/queue';
 import {analyzeFundingProjects, type AnalysisModel} from '../analysis.ts';
 import {fundingProject} from '../publication.ts';
 import {discoverFundingCandidates, updateFundingProject} from '../tracking.ts';
+import {reviewFundingProjects, type ReviewModel} from '../review.ts';
 
 after(closeDb);
 async function create(name: string) {
@@ -80,4 +81,31 @@ test('analysis returns its reserved connection even when unlock fails', async t 
   const mocked=t.mock.method(sql,'reserve',async()=>connection as unknown as Awaited<ReturnType<typeof sql.reserve>>);
   try{await assert.rejects(analyzeFundingProjects(answer),error=>error===failure);}finally{mocked.mock.restore();}
   assert.equal(released,1);
+});
+
+test('changed evidence waits for automatic review before regenerating its public analysis', async () => {
+  await sql`UPDATE rootdata_projects SET tracking_status='paused'`;
+  process.env.MODEL_CALLS_ENABLED = 'true';
+  const item = await create('AutomaticRefresh');
+  const review: ReviewModel = async project => ({receiptId: null, model: 'review-test', data: {
+    decision: 'approve', reason: 'Follow the announced data network and launch milestones.',
+    identityMatched: true, fundingConfirmed: true, canonicalName: null, nameCitation: null,
+    citations: [{sourceId: item.articleId, quote: project.evidence.find(e => e.articleId === item.articleId)!.title}],
+  }});
+  await reviewFundingProjects(review);
+  assert.equal((await analyzeFundingProjects(answer)).updated, 1);
+  assert.ok((await fundingProject(item.id))?.analysis);
+  await sql`UPDATE publications SET summary=summary || ' New product launch milestones were announced.', revision=revision+1
+    WHERE article_id=${item.articleId}`;
+  await discoverFundingCandidates();
+  assert.equal(await fundingProject(item.id), null, 'the old automatic approval cannot publish changed evidence');
+  let calls = 0;
+  const ask: AnalysisModel = async project => {calls++; return answer(project);};
+  assert.equal((await analyzeFundingProjects(ask)).updated, 0);
+  assert.equal(calls, 0, 'analysis waits for the review of the new input');
+  assert.equal((await reviewFundingProjects(review)).updated, 1);
+  assert.equal((await analyzeFundingProjects(ask)).updated, 1);
+  assert.ok((await fundingProject(item.id))?.analysis);
+  assert.equal((await analyzeFundingProjects(ask)).updated, 0);
+  assert.equal(calls, 1, 'the refreshed analysis is cached');
 });

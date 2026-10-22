@@ -83,7 +83,8 @@ async function recordedCall<T>(endpoint: string, identity: object, account: stri
 export async function discoverFundingCandidates(now = new Date()): Promise<{ scanned: number; candidates: number; truncated: boolean }> {
   let scanned = 0;
   let candidates = 0;
-  const watched = await sql<{ id: number; name: string }[]>`SELECT id, name FROM rootdata_projects WHERE review_status = 'approved' AND tracking_status = 'watching'`;
+  // Deferred and rejected candidates can become worth following when new evidence arrives.
+  const watched = await sql<{ id: number; name: string }[]>`SELECT id, name FROM rootdata_projects WHERE tracking_status = 'watching'`;
   for (let page = 0; page < 20; page += 1) {
     const reports = await readPublishedEvidence({ since: new Date(now.getTime() - 30 * DAY), limit: 500, offset: page * 500 });
     scanned += reports.length;
@@ -148,7 +149,7 @@ export async function enrichFundingProjects(remote: RootDataProvider = provider)
         await sql.begin(async (tx) => {
           await completeReceipt(tx, result.receiptId);
           if (!match) await tx`UPDATE rootdata_projects SET next_refresh_at = ${new Date(Date.now() + REFRESH)},
-            last_error = '没有唯一同名项目，请核对项目名称或指定 RootData ID', updated_at = now() WHERE id = ${row.id} AND version = ${row.version}`;
+            last_error = '暂未找到唯一同名档案；自动审核仍会依据公开报道继续，资料变化后重新匹配', updated_at = now() WHERE id = ${row.id} AND version = ${row.version}`;
         });
         if (!match) continue;
         rootdataId = match.id;
