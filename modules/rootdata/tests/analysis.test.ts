@@ -89,7 +89,7 @@ test('changed evidence waits for automatic review before regenerating its public
   const item = await create('AutomaticRefresh');
   const review: ReviewModel = async project => ({receiptId: null, model: 'review-test', data: {
     decision: 'approve', reason: 'Follow the announced data network and launch milestones.',
-    identityMatched: true, fundingConfirmed: true, canonicalName: null, nameCitation: null,
+    identityMatched: true, fundingConfirmed: true, canonicalName: null,
     citations: [{sourceId: item.articleId, quote: project.evidence.find(e => e.articleId === item.articleId)!.title}],
   }});
   await reviewFundingProjects(review);

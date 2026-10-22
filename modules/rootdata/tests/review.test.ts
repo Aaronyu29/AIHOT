@@ -30,7 +30,7 @@ async function view(id: number) { return (await projectViews(await sql<ProjectRo
 function answer(project: Parameters<ReviewModel>[0], decision: ReviewOutput['decision'] = 'approve', canonicalName: string | null = null) {
   const citation = {sourceId: project.evidence[0]!.articleId, quote: project.evidence[0]!.title};
   return {receiptId: null, model: 'test-review', data: {decision, reason: decision === 'approve' ? '融资用于开发者数据网络，继续核验产品交付。' : '现有资料不足以确认业务后续进展。',
-    identityMatched: true, fundingConfirmed: true, canonicalName, nameCitation: canonicalName ? citation : null, citations: [citation]}};
+    identityMatched: true, fundingConfirmed: true, canonicalName, citations: [citation]}};
 }
 
 test('automatic approval publishes without manual review and pauses are preserved', async () => {

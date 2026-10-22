@@ -9,7 +9,7 @@ const project: FundingAdminProject = {id: 1, name: 'Sample', description: '', ta
   evidence: [{articleId: 'article1', title: 'Sample raises $10 million to build a data network', summary: 'The product serves developers.',
     sourceName: 'News', url: 'https://example.org/article', publishedAt: '2026-10-22T10:00:00Z', kind: 'funding'}]};
 const output: ReviewOutput = {decision: 'approve', reason: '跟踪开发者数据网络交付。', identityMatched: true, fundingConfirmed: true,
-  canonicalName: null, nameCitation: null, citations: [{sourceId: 'article1', quote: project.evidence[0]!.title}]};
+  canonicalName: null, citations: [{sourceId: 'article1', quote: project.evidence[0]!.title}]};
 
 test('current financing evidence can approve without a RootData profile; unrelated claims cannot', () => {
   assert.equal(validateReview(output, project).decision, 'approve');
@@ -32,12 +32,26 @@ test('real headline forms support exact canonical project names, not an invented
   for (const [name, canonicalName, title] of examples) {
     const value = {...project, name: name!, evidence: [{...project.evidence[0]!, title: title!}]};
     const citation = {sourceId: 'article1', quote: title!};
-    const answer = {...output, canonicalName: canonicalName!, nameCitation: citation, citations: [citation]};
+    const answer = {...output, canonicalName: canonicalName!, citations: [citation]};
     assert.equal(validateReview(answer, value).canonicalName, canonicalName);
-    assert.throws(() => validateReview({...answer, nameCitation: null}, value), /Canonical/);
+    assert.throws(() => validateReview({...answer, citations: [{sourceId: 'article1', quote: 'The product serves developers.'}]}, value), /Canonical/);
+    assert.throws(() => validateReview({...answer, identityMatched: false}, value), /Canonical/);
     assert.throws(() => validateReview({...answer, canonicalName: canonicalName!.slice(0, -1)}, value), /Canonical/);
     assert.throws(() => validateReview({...answer, canonicalName: 'InventedName'}, value), /Canonical/);
   }
+});
+
+test('a legacy string nameCitation cannot break a supported correction or substitute for verified citations', () => {
+  const title = '红杉支持的 Catalyst 融资 3000 万美元，为普通投资者打造 AI 交易智能体';
+  const value = {...project, name: '红杉支持的 Catalyst', evidence: [{...project.evidence[0]!, title}]};
+  const legacy = {...output, canonicalName: 'Catalyst', nameCitation: 'Catalyst', citations: [{sourceId: 'article1', quote: title}]};
+  const validated = validateReview(legacy, value);
+  assert.equal(validated.canonicalName, 'Catalyst');
+  assert.equal('nameCitation' in validated, false);
+  assert.throws(() => validateReview({...legacy, citations: [{sourceId: 'article1', quote: 'The product serves developers.'}]}, value), /Canonical/);
+  assert.throws(() => validateReview({...legacy, citations: [{sourceId: 'article1', quote: 'Catalyst completed a billion dollar financing.'}]}, value), /citation/);
+  assert.throws(() => validateReview({...legacy, canonicalName: 'Cata'}, value), /Canonical/);
+  assert.throws(() => validateReview({...legacy, citations: []}, value));
 });
 
 test('input identity follows facts and project identity, never its own output or admin state', () => {
