@@ -10,6 +10,7 @@ import { sanitizeBody } from "../content/sanitize.ts";
 import { JINA_PREFIX, jinaRead } from "../providers/jina.ts";
 import { articleUtcOffset, readPublicationDate, type PublicationDate } from "./dates.ts";
 import { FetchError, type Candidate, type SourceRow } from "./types.ts";
+import { fetchProjectPage } from "./project-pages.ts";
 
 
 /** A date rule names one element; unrelated tooltips must not hide its visible publication date. */
@@ -330,6 +331,7 @@ async function fromMimoHome(html: string, base: string, source: SourceRow): Prom
 }
 
 export async function fetchWebList(source: SourceRow): Promise<Candidate[]> {
+  if (["ethglobal_showcase", "csx_accelerator", "easy_residency"].includes(source.config.adapter)) return fetchProjectPage(source);
   const { text, viaJina, base } = await fetchListingText(source);
   const mode = source.config.adapter === "mimo_home" ? "mimo_home" : source.config.parseMode ?? (viaJina ? "markdown" : "html");
   let out: Candidate[];
