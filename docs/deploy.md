@@ -281,3 +281,11 @@ cd apps/web && NODE_ENV=production node --env-file=../../.env server.ts   # 网�
 三个进程要一直运行，生产环境用 systemd 或 pm2 守护（守护配置里同样设 `NODE_ENV=production`）。停止 worker 时给它 515 秒（systemd 的 `TimeoutStopSec=515`、pm2 的 `kill_timeout: 515000` 和 `treekill: false`），覆盖队列的 470 秒排空和数据库清理；systemd 还需设 `KillMode=mixed`，只先通知主进程停止接任务，让正在备份的 `pg_dump`、`tar` 自然完成。被提前杀掉的调用结果不明，要等至少半小时自动放行后才会重试。
 
 开发时用带热更新的方式：`npm run dev:api`、`npm run dev:worker`、`npm run dev:web`。开发时想免登录进后台，在 `.env` 里设 `DEV_AUTH_ROLE=admin`（生产环境会拒绝启动）。
+
+### OKX 新闻模块
+
+配置 `OKX_NEWS_PROJECTS_JSON` 到服务器环境（JSON 数组，每项包含非敏感项目标识 `id` 和 `key`、`secret`、`passphrase`），不提交密钥。启用 `okx-news` 外部信源后由模块按信源间隔采集（默认 15 分钟）。只请求 `detailLevel=1`，保存标题、摘要、发布时间和原文链接，不抓正文。先按币种标签或区块链关键词排除无关科技信息，再进入现有筛选。原文链接使用接口真实返回值，可能指向 OKX 聚合页。
+
+首次最多导入 8 篇；之后按时间窗增量读取，每轮最多两页，未读游标保留到下轮，成功入库才推进位置。复用原生 URL 去重、文章写入、处理队列和请求回执。`okx_news` 预算须预先配置；建议 2 次/分钟、12 次/小时、200 次/天。遇到 402 或配额不足停止本次采集，不签署付款、不自动充值。该模块不调整已有信源频率或 DeepSeek 预算。
+
+项目凭据按请求轮转，轮转位置随采集游标保存在数据库，重启不重置；回执的 model 字段保存项目标识，request 中不保存密钥。额度拒绝或限流时保留读取窗口，下轮从下一个项目继续，不自动付款。预算为所有项目合计，不以轮转绕过本站请求上限。这里统计的是本站调用量，不代表该项目被其他应用共用后的剩余额度。

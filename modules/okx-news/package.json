@@ -1,0 +1,11 @@
+{
+  "name": "@aihot/okx-news",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./server.ts"
+  },
+  "dependencies": {
+    "@aihot/backend": "*"
+  }
+}
