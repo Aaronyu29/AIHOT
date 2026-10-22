@@ -21,8 +21,8 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
   {
     title: "内容",
     items: [
-      { to: "/", label: "精选", icon: IconBolt, end: true },
       { to: "/all", label: subjectAfter("全部", "动态"), icon: IconList },
+      { to: "/featured", label: "精选", icon: IconBolt, end: true },
       { to: "/hot", label: "热点榜", icon: IconFlame },
       { to: "/daily", label: withSubject("日报"), icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },
@@ -49,12 +49,12 @@ const UP = {
 } as const;
 
 /**
- * Where pages under a navigation entry lead back up to: the entry, or 精选 in its place while the site hides
+ * Where pages under a navigation entry lead back up to: the entry, or 全部 in its place while the site hides
  * it. `name` is for breadcrumbs and desktop back links (热点榜), `back` for the phone bar (热点), `tab` the
  * phone tab it sits under, `crumbs` its breadcrumb after the site's home.
  */
 export function navUp(entry: keyof typeof UP): { to: string; name: string; back: string; tab: TabKey; crumbs: Array<{ name: string; path: string }> } {
-  if (!inNav(entry)) return { to: "/", name: "精选", back: "精选", tab: "featured", crumbs: [] };
+  if (!inNav(entry)) return { to: "/", name: "全部", back: "全部", tab: "featured", crumbs: [] };
   return { to: entry, ...UP[entry], crumbs: [{ name: UP[entry].name, path: entry }] };
 }
 
@@ -77,13 +77,14 @@ export function sidebar(): Array<{ title: string; items: NavItem[] }> {
 
 /** A sidebar entry is lit on its pages; 日报 also covers weekly and monthly reports. */
 export function sidebarIsActive(item: NavItem, pathname: string): boolean {
+  if (item.to === "/all" && pathname === "/") return true;
   if (item.end) return pathname === item.to;
   if (item.to === "/daily") return /^\/(daily|weekly|monthly)(\/|$)/.test(pathname);
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
 /**
- * The phone tab bar: 全部 lives beside 精选 as a switch, 热点 and 日报 are tabs, and "我的" at /more holds
+ * The phone tab bar: 精选 lives beside 全部 as a switch, 热点 and 日报 are tabs, and "我的" at /more holds
  * 收藏, 外观, the tools and the site's own pages. Which tab a page sits under is declared by the page
  * itself (components/shell/screens.ts).
  */
@@ -104,7 +105,7 @@ export interface Tab {
 }
 
 const ENGINE_TABS: Tab[] = [
-  { key: "featured", to: "/", label: "精选", icon: IconBolt },
+  { key: "featured", to: "/", label: "全部", icon: IconList },
   { key: "hot", to: "/hot", label: "热点", icon: IconFlame },
   { key: "daily", to: "/daily", label: "日报", icon: IconDoc },
   { key: "me", to: "/more", label: "我的", icon: IconUser, changelog: true },

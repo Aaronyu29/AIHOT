@@ -52,7 +52,7 @@ const PAGES: Array<{ path: string; ready: (page: Page, width: number) => Promise
     ready: (page: Page) => expect(page.getByRole("heading", { name: "今日头条", exact: true })).toBeVisible(),
   })),
   {
-    path: "/",
+    path: "/featured",
     ready: async (page: Page, width: number) => {
       // Desktop opens the group in place; phones open it in a sheet.
       if (width < 961) return expect(page.getByRole("link", { name: "代表文章", exact: true })).toBeVisible();
