@@ -26,7 +26,7 @@ import { scrollToAnchor } from "../lib/motion";
 import { takePreview } from "../features/item/preview";
 import { IconArrowLeft, IconCopy, IconDownload, IconExternal, IconImage, IconMenu, IconMore, IconShare } from "../components/icons";
 import { BarButton, PhoneBar } from "../components/shell/PhoneBar";
-import { isPhone, type Screen } from "../components/shell/screens";
+import type { Screen } from "../components/shell/screens";
 
 export const handle: Screen = { home: "featured", toolbar: true };
 export { pageHeaders as headers } from "../lib/api.server";
@@ -41,14 +41,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 type Preview = { item: null; preview: FeedItemSummary; detail: Promise<{ item: SiteItemDetail }> };
 
 /**
- * Phones: an article tapped in a list opens at once with what the card showed (title, summary, reason),
- * while its full text loads. Opened any other way, or on desktop, the page waits for its data as usual.
+ * An article opened from a list shows the card's title, summary and reason while its detail loads.
+ * Direct visits have no card preview and wait for their server data as usual.
  */
 const reuse = pageReuse<typeof loader>();
 export const { shouldRevalidate } = reuse;
 export async function clientLoader(args: ClientLoaderFunctionArgs) {
   const { params } = args;
-  const preview = isPhone() && params.id ? takePreview(params.id) : null;
+  const preview = params.id ? takePreview(params.id) : null;
   if (!preview) return reuse.clientLoader(args);
   return { item: null, preview, detail: reuse.clientLoader(args) } satisfies Preview;
 }
@@ -199,17 +199,39 @@ export default function ItemPage() {
   );
 }
 
-/** Phones, while the article loads: what the card showed, in the article's own places. */
+/** While the article loads: what the card showed, in the article's own places. */
 function ItemPreview({ preview }: { preview: FeedItemSummary }) {
   const [toast, setToast] = useToast();
+  const navigate = useNavigate();
   const isX = preview.channel === "x" && !!preview.x;
   // Without a reliable date from the original, the card's time is when it was collected, and says so.
   const shownAt = preview.publishedAt ?? preview.timelineAt;
+  const back = (
+    <button type="button" onClick={() => navigate(-1)} className="inline-flex h-8 items-center gap-1.5 text-[12.5px] text-ink-3 hover:text-ink">
+      <IconArrowLeft size={14} />返回
+    </button>
+  );
   return (
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-8">
       <PhoneBar back={{ to: preview.selected ? "/featured" : "/all", label: preview.selected ? "精选" : "全部" }} title={isX ? preview.x!.authorName : preview.title} />
-      <article className="pb-6 pt-3" aria-busy="true">
-        <div className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3">
+      <ArticleLayout
+        left={
+          <>
+            {back}
+            <RailSection title="来源">
+              <div className="text-[14px] font-semibold text-ink">{isX ? preview.x!.authorName : preview.source.name}</div>
+              <div className="mt-3 text-[12px] text-ink-4">{preview.publishedAt ? "发布时间" : "收录于"}</div>
+              <time dateTime={shownAt} className="mono mt-0.5 block text-[12.5px] text-ink-2">{fullDateTime(shownAt)}</time>
+            </RailSection>
+          </>
+        }
+        right={shownScore(preview.score) !== null ? (
+          <RailSection title="AI 评分"><ScoreLabel score={preview.score} /></RailSection>
+        ) : undefined}
+      >
+      <div className="sticky top-0 z-20 -mx-2 hidden bg-bg/95 px-2 py-1.5 backdrop-blur lg:block 2xl:hidden">{back}</div>
+      <article className="pb-6 pt-3 lg:pt-2 2xl:pt-1" aria-busy="true">
+        <div className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3 2xl:hidden">
           <span className="font-semibold text-ink-2">{isX ? preview.x!.authorName : preview.source.name}</span>
           {isX && <span>· @{preview.x!.handle} · X</span>}
           <span>·</span>
@@ -222,11 +244,11 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
             </span>
           )}
         </div>
-        {!isX && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink">{preview.title}</h1>}
+        {!isX && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink lg:text-[32px] lg:leading-[1.34] xl:text-[36px] xl:leading-[1.3]">{preview.title}</h1>}
         {preview.summary && (
           <section className={isX ? "mt-4" : "mt-7"}>
             <div className="mb-2 text-[12px] font-semibold text-accent">{isX && preview.summary.replace(/\s+/g, " ").trim() === preview.title ? "原文" : "AI 导读"}</div>
-            <p className="text-[18px] leading-[1.7] text-ink">{preview.summary}</p>
+            <p className="text-[18px] leading-[1.7] text-ink xl:text-[20px] xl:leading-[1.7]">{preview.summary}</p>
           </section>
         )}
         {preview.reason && (
@@ -241,6 +263,7 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
           ))}
         </div>
       </article>
+      </ArticleLayout>
       <ReaderToolbar
         item={preview}
         originalLabel={isX ? "原推" : "原文"}

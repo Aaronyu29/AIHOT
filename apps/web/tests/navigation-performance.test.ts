@@ -156,6 +156,47 @@ test('hover downloads nothing, a press fetches article data once for its click, 
   }finally{failing='';await context.close();}
 });
 
+test('desktop and phone readers see the card immediately while detail is pending, then the real body or retry',async()=>{
+  for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
+    for(const [path,title] of [['/','全部第 1 页'],['/featured','性能检查文章']]){
+    const context=await chrome.newContext({viewport});const page=await context.newPage();
+    let release!:()=>void;
+    const pending=new Promise<void>(resolve=>{release=resolve;});
+    try{
+      await context.route('**/items/navigation-fixture.data*',async route=>{await pending;await route.continue();});
+      await visit(page,origin+path);
+      await page.getByRole('link',{name:title,exact:true}).click();
+      await expect(page.locator('article[aria-busy=true]')).toContainText('固定摘要',{timeout:1500});
+      await expect(page.locator('h1')).toHaveText(title);
+      await expect(page.getByText('固定正文',{exact:true})).not.toBeVisible();
+      release();
+      await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
+      await expect(page.locator('article[aria-busy=true]')).toHaveCount(0);
+      await page.goBack();
+      await expect(page.getByRole('link',{name:title,exact:true})).toBeVisible();
+      await page.getByRole('link',{name:title,exact:true}).click();
+      await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
+    }finally{release();await context.close();}
+    }
+  }
+  const context=await chrome.newContext();const page=await context.newPage();
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  try{
+    await context.route('**/items/navigation-fixture.data*',async route=>{await pending;await route.continue();});
+    await visit(page,origin+'/featured');
+    failing='/api/site/items/navigation-fixture';
+    await page.getByRole('link',{name:'性能检查文章',exact:true}).click();
+    await expect(page.locator('article[aria-busy=true]')).toContainText('固定摘要');
+    release();
+    await expect(page.getByText('暂时无法加载',{exact:true})).toBeVisible();
+    await expect(page.locator('article[aria-busy=true]')).toHaveCount(0);
+    failing='';
+    await page.getByRole('button',{name:'重试',exact:true}).click();
+    await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
+  }finally{failing='';release();await context.close();}
+});
+
 test('SSR all-pages and report kinds return offline with their own content',async()=>{
   const context=await chrome.newContext();const page=await context.newPage();
   try{
