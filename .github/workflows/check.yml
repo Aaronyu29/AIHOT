@@ -126,7 +126,6 @@ jobs:
           docker compose run --rm --no-deps --entrypoint node setup scripts/smoke.ts --base http://web:3000
           docker compose exec -T db psql -U aihot -d aihot -Atc "select count(*) from sources" | grep -qx "$(node -p "require('./industry/sources.json').sources.length")"
       - name: Export the tested release image
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
           mkdir -p "$RUNNER_TEMP/release"
           docker save "aihot-app:$GITHUB_SHA" | gzip -1 > "$RUNNER_TEMP/release/image.tar.gz"
@@ -140,8 +139,14 @@ jobs:
           cd "$RUNNER_TEMP/release"
           sha256sum image.tar.gz install-ci-release.py release.json > SHA256SUMS
       - name: Exercise the release installer on the throwaway site
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
+          # PR merge commits are not origin/main. A local test origin exercises the same
+          # latest-main guard without bypass flags or production credentials.
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            git init --bare "$RUNNER_TEMP/release-origin.git"
+            git push "$RUNNER_TEMP/release-origin.git" "$GITHUB_SHA:refs/heads/main"
+            git remote set-url origin "$RUNNER_TEMP/release-origin.git"
+          fi
           mkdir -p .data
           docker compose --profile https up -d --no-build caddy
           python3 deploy/install-ci-release.py --root "$PWD" --bundle "$RUNNER_TEMP/release" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID"
@@ -159,4 +164,5 @@ jobs:
         run: docker compose logs --tail 80
       - name: Stop
         if: always()
-        run: docker compose down -v
+        # CI uses only stubs with model calls and collection disabled; production keeps its 515s grace period.
+        run: docker compose --profile https down -v --timeout 30
