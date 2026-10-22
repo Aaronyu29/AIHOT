@@ -46,6 +46,7 @@ export const CATEGORY_TAGS = [
 
 /** 可选的主题标签。 */
 export const TOPIC_TAGS = [
+  "开发工具", "云原生", "DevOps", "数据库", "数据工程", "Web开发", "测试/质量", "软件安全", "Layer2", "DeFi", "钱包/账户", "稳定币/支付", "RWA", "加密市场", "交易平台", "链上安全",
   "Agent", "编码", "推理", "多模态", "语音", "视频", "图像生成", "RAG", "端侧", "数据/训练", "搜索", "部署/工程", "开源生态", "具身智能", "MCP/工具调用",
 ] as const;
 
@@ -62,7 +63,7 @@ export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
   教程: "教程/实践", 玩法: "教程/实践", 指南: "教程/实践", 技巧: "教程/实践", 最佳实践: "教程/实践", 实践: "教程/实践",
   产品: "产品更新", 更新: "产品更新", 发布: "模型发布", 模型: "模型发布", 趋势: "现象/趋势", 现象: "现象/趋势", 观点: "大佬观点",
   视频生成: "视频", 非ai: "非AI/通用工具", "non-ai": "非AI/通用工具", 通用工具: "非AI/通用工具", 工程工具: "非AI/通用工具",
-  安全扫描: "非AI/通用工具", devops: "非AI/通用工具", 行业: "行业动态", 动态: "行业动态",
+  安全扫描: "软件安全", devops: "DevOps", defi: "DeFi", layer2: "Layer2", rwa: "RWA", 行业: "行业动态", 动态: "行业动态",
 };
 
 // ── 公司与主体 ──────────────────────────────────────────────────────────────────────────
@@ -74,6 +75,12 @@ export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
  * 所有这些名字都用来认出说的是哪家公司，比如把事实的主体对到发布方。
  */
 export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; orgNames?: string[]; otherNames?: string[] }> = {
+  bitcoin: { name: "Bitcoin", displayTag: null, aliases: ["Bitcoin","比特币","BTC"] },
+  ethereum: { name: "Ethereum", displayTag: null, aliases: ["Ethereum","以太坊","ETH","Ethereum Foundation","以太坊基金会"] },
+  solana: { name: "Solana", displayTag: null, aliases: ["Solana","Solana Foundation","Anza"] },
+  arbitrum: { name: "Arbitrum", displayTag: null, aliases: ["Arbitrum","Offchain Labs"] },
+  chainlink: { name: "Chainlink", displayTag: null, aliases: ["Chainlink"] },
+  uniswap: { name: "Uniswap", displayTag: null, aliases: ["Uniswap","Uniswap Labs"] },
   "world-labs": { name: "World Labs", displayTag: null, aliases: ["World Labs"] },
   "thinking-machines": { name: "Thinking Machines Lab", displayTag: null, aliases: ["Thinking Machines"] },
   amd: { name: "AMD", displayTag: null, aliases: ["AMD", "Advanced Micro Devices"] },
