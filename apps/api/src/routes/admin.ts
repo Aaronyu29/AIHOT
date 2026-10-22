@@ -2,7 +2,7 @@
 // Every route goes through adminHandler (session + CSRF); manual changes are audited in the modules.
 import { readFile } from "node:fs/promises";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { AdminSourceUpdate } from "@aihot/contracts/admin";
+import type { AdminSourceUpdate, SourceQualitySort } from "@aihot/contracts/admin";
 import { actorOf } from "@aihot/backend/admin/auth";
 import { navCounts } from "@aihot/backend/admin/navigation";
 import { listAudit } from "@aihot/backend/audit";
@@ -38,7 +38,8 @@ export function registerAdmin(app: FastifyInstance) {
   // Sources
   app.get("/api/admin/sources", adminHandler(async (req) => {
     const f = q(req);
-    return listSources({ q: f.q, kind: f.kind, health: f.health, mode: f.mode, enabled: f.enabled as "true" | "false" | undefined, page: page(req) });
+    return listSources({ q: f.q, kind: f.kind, health: f.health, mode: f.mode, enabled: f.enabled as "true" | "false" | undefined,
+      page: page(req), window: f.window === undefined ? undefined : Number(f.window), sort: f.sort as SourceQualitySort | undefined });
   }));
   app.post("/api/admin/sources", adminHandler(async (req, _reply, admin) => createSource(body(req), actorOf(admin))));
   app.post("/api/admin/sources/preview", adminHandler(async (req) => previewSource(body(req) as never)));
