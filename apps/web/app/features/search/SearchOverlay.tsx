@@ -102,7 +102,7 @@ export function SearchOverlay() {
     setOpen(false);
   }
 
-  const companies = (more?.topics ?? []).filter((t) => t.group === "company").slice(0, 6);
+  const suggestedTopics = (more?.topics ?? []).filter((t) => t.group !== "genre").slice(0, 6);
   const chip = "inline-flex h-11 max-w-full items-center rounded-full px-3.5 text-[14px] transition-colors";
   return (
     <div
@@ -184,11 +184,11 @@ export function SearchOverlay() {
             </section>
           )}
 
-          {companies.length > 0 && (
+          {suggestedTopics.length > 0 && (
             <section className="pt-6">
               <h2 className="text-[13px] font-semibold text-ink-3">按主题找</h2>
               <div className="mt-2.5 flex flex-wrap gap-2">
-                {companies.map((t) => (
+                {suggestedTopics.map((t) => (
                   <Link viewTransition key={t.slug} to={`/topics/${t.slug}`} className={`${chip} bg-well text-ink-2 ring-1 ring-inset ring-line-soft active:bg-bg-muted`}>
                     <span className="truncate">{t.name}</span>
                   </Link>

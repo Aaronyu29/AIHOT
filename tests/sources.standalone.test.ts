@@ -169,6 +169,23 @@ test("feed text that only teases the article is a summary: the page is fetched b
   assert.equal(signal.candidates[0]!.bodyStatus, "ok");
 });
 
+test("an RSS source can process summaries without requesting the article page", async () => {
+  const read = async (path: string) => (await fetchRss({ id: "test-feed", config: { feedUrl: site + path, fetchPublicContent: false }, participation_mode: "editorial", cursor: null } as never, { force: true })).candidates;
+  for (const path of ["/notes.xml", "/notes.atom"]) {
+    const [item] = await read(path);
+    assert.equal(item!.bodyStatus, "none");
+    assert.equal(item!.bodyText, null);
+    assert.equal(item!.excerpt, "How leaders build confidence with their team.");
+    assert.equal(item!.url, "https://example.org/episodes/42");
+  }
+  const [teaser, whole] = await read("/teaser.xml");
+  assert.equal(teaser!.bodyStatus, "none");
+  assert.equal(teaser!.bodyText, null);
+  assert.equal(teaser!.excerpt, "AMD announced today that it's acquiring World Labs.");
+  assert.equal(whole!.bodyStatus, "ok", "complete feed content is retained");
+  assert.ok(whole!.bodyText!.length > 1000);
+});
+
 test("a source that declares its feed summary the body keeps a short one, in RSS and Atom; a teaser is still a summary", async () => {
   const note = "How leaders build confidence with their team.";
   const read = async (path: string, summaryIsBody?: boolean) =>

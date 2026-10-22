@@ -56,9 +56,9 @@
 - `TAG_SYNONYMS`：模型常写的近义词，统一成词表里的写法（比如“融资”记成“行业动态”）。换了词表，这里也换成新词表的近义词。
 - `ENTITIES`：行业里的主要公司或机构，用于“公司”类主题页。`aliases` 给结构化的模型看；`otherNames` 是公司自己的其他称呼（官方账号名、子品牌），把新闻的主体对到公司、判断标题有没有点名这家公司时也认它们。`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES` 用来防止模型在标题摘要里写进原文没提到的公司：标题摘要里出现的公司，原文里也要出现过；`IDENTITY_CONTEXT_ALIASES` 列出原文里也算提到这家公司的写法（比如官方账号名）。别的行业没有这个需要可以清空。
 - `ITEM_TYPES`：内容类型，和评分提示词里的权重表对应，改了要一起改提示词。
-- `topics.json`：主题目录（`/topics`）。站点启动时读取，改完重新构建（`docker compose up -d --build`）才生效。分三组：`company`（公司与机构）、`field`（方向）、`genre`（内容形态）。`slug` 上线后不要改。
-  - `company` 主题用 `entityId`（`ENTITIES` 的 id）收以这家公司为主体的报道；一篇报道的主体有几家公司时，标题里点了它的名才算。可选：`aliases`（搜索框里只搜这个词，也能找出这家公司的报道）。
-  - `field` 和 `genre` 主题用 `tags` 收打了这些标签的报道。
+- `topics.json`：主题目录（`/topics`）。站点启动时读取，改完重新构建（`docker compose up -d --build`）才生效。本站分三组：`software`（软件工程）、`blockchain`（区块链）、`genre`（内容形态）。`slug` 上线后不要改。
+  - 主体主题用 `entityId`（`ENTITIES` 的 id）收以这家公司为主体的报道；一篇报道的主体有几家公司时，标题里点了它的名才算。可选：`aliases`（搜索框里只搜这个词，也能找出这家公司的报道）。
+  - 其他方向和 `genre` 主题用 `tags` 收打了这些标签的报道。
 
 ## 3. 信源：`industry/sources.json`
 

@@ -421,7 +421,7 @@ export interface ReportNavigationEntry { key: string; issueNumber: number; title
 
 // Topics
 
-export type TopicGroupKey = "company" | "field" | "genre";
+export type TopicGroupKey = "software" | "blockchain" | "genre";
 
 export interface TopicGroup {
   key: TopicGroupKey;

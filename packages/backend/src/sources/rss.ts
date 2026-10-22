@@ -125,7 +125,7 @@ function feedText(bodyHtml: string | null, summaryText: string | null, source: S
   const excerpt = summaryText !== null ? collapseWhitespace(summaryText).slice(0, 2000) : teaser ? collapseWhitespace(bodyText!) : null;
   return bodyText && (bodyText.length > 280 || source.config.summaryIsBody === true) && !teaser
     ? { excerpt, bodyHtml, bodyText, bodyStatus: "ok" }
-    : { excerpt, bodyHtml: null, bodyText: null, bodyStatus: hasPage ? "pending" : "none" };
+    : { excerpt, bodyHtml: null, bodyText: null, bodyStatus: hasPage && source.config.fetchPublicContent !== false ? "pending" : "none" };
 }
 
 interface RssValidator {

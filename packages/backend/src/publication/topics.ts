@@ -1,4 +1,4 @@
-// Topics: stable slugs in three groups (companies, directions, content forms), defined by the industry
+// Topics: stable slugs in three groups (software, blockchain, content forms), defined by the industry
 // pack (industry/topics.json) and read from there when the process starts. Which reports a topic takes
 // is one SQL predicate, `membership`: a direction or a form takes its tags; a company takes the reports
 // it is a subject of, but not those that only mention it — among several subject companies, its name must
@@ -224,7 +224,7 @@ const monogram = (t: Topic): Brand => ({ src: null, monogram: t.name.replace(/[^
 
 /** Every company's mark, by its topic's slug. */
 async function companyBrands(): Promise<Map<string, Brand>> {
-  const companies = TOPICS.filter((t) => t.group === "company");
+  const companies = TOPICS.filter((t) => t.entityId !== null);
   const brands = new Map<string, Brand>(companies.map((t) => [t.slug, monogram(t)]));
   // The modules' marks over the monograms.
   for (const m of serverModules()) {

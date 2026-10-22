@@ -19,7 +19,8 @@
         "官方"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-google-deepmind",
@@ -39,7 +40,8 @@
         "官方"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-google-research",
@@ -60,7 +62,8 @@
         "研究"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-hugging-face",
@@ -81,7 +84,8 @@
         "开源"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-microsoft-research",
@@ -102,7 +106,8 @@
         "研究"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-nvidia-blog",
@@ -122,7 +127,8 @@
         "官方"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-aws-ml",
@@ -143,7 +149,8 @@
         "教程"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-github-ai",
@@ -163,7 +170,8 @@
         "官方"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-mistral",
@@ -183,7 +191,8 @@
         "官方"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-bair",
@@ -203,7 +212,8 @@
         "研究"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-the-verge-ai",
@@ -223,7 +233,8 @@
         "媒体"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-techcrunch-ai",
@@ -243,7 +254,8 @@
         "媒体"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-ars-technica-ai",
@@ -263,7 +275,8 @@
         "媒体"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-mit-tech-review-ai",
@@ -283,7 +296,8 @@
         "媒体"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-the-decoder",
@@ -303,7 +317,8 @@
         "媒体"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-simon-willison",
@@ -323,7 +338,8 @@
         "个人"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true
     },
     {
       "id": "rss-import-ai",
@@ -344,7 +360,8 @@
         "周刊"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-latent-space",
@@ -364,7 +381,277 @@
         "个人"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-baoyu",
+      "name": "宝玉的分享",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://s.baoyu.io/feed.xml",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "AI"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-anthropic-news-rsshub",
+      "name": "Anthropic News（RSSHub 转接）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://rsshub.bestblogs.dev/anthropic/news",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "AI"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-nvidia-technical",
+      "name": "NVIDIA Technical Blog",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://developer.nvidia.com/blog/feed/",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "AI"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-pragmatic-engineer",
+      "name": "The Pragmatic Engineer",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://blog.pragmaticengineer.com/rss/",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "软件工程"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-cloudflare",
+      "name": "Cloudflare",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://blog.cloudflare.com/rss",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "软件工程"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-martin-fowler",
+      "name": "Martin Fowler",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://martinfowler.com/feed.atom",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "软件工程"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-sean-goedecke",
+      "name": "Sean Goedecke",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.seangoedecke.com/rss.xml",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "软件工程"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-ruanyifeng",
+      "name": "阮一峰",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "http://feeds.feedburner.com/ruanyifeng",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "软件工程"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-panews-featured",
+      "name": "PANews 精选深度",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.panewslab.com/rss.xml?lang=zh&type=NORMAL%2CNEWS%2CVIDEO&featured=true&in-depth=true",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "加密新闻与热点"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-the-block",
+      "name": "The Block",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.theblock.co/rss.xml",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        },
+        "fetchPublicContent": false
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "加密新闻与热点"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-blockbeats",
+      "name": "律动 BlockBeats（官方源，待恢复）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://api.theblockbeats.news/v2/rss/all",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "加密新闻与热点"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-ethereum-foundation",
+      "name": "Ethereum Foundation",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://blog.ethereum.org/en/feed.xml",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "核心",
+        "额外补充-区块链原始资料"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "okx-news",
+      "name": "OKX 聚合新闻",
+      "kind": "external",
+      "config": {},
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 15,
+      "tags": [
+        "区块链",
+        "新闻聚合"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
     }
   ]
 }

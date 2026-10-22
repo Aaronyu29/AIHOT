@@ -1,0 +1,45 @@
+import '../../../tests/setup.ts';
+import assert from 'node:assert/strict';
+import {after,test} from 'node:test';
+import {sql,closeDb} from '@aihot/backend/db';
+import {stopBoss} from '@aihot/backend/jobs/queue';
+import {collectNews,SOURCE_ID} from '../server.ts';
+import {NewsApiError} from '../client.ts';
+process.env.COLLECT_ENABLED='true';
+process.env.OKX_NEWS_PROJECTS_JSON=JSON.stringify([{id:'A',key:'test-a',secret:'secret-a',passphrase:'pass-a'},{id:'B',key:'test-b',secret:'secret-b',passphrase:'pass-b'}]);
+after(async()=>{await stopBoss();await closeDb();});
+test('incremental collection rotates projects, deduplicates, resumes pages and preserves budget limits',async()=>{
+ await sql`INSERT INTO sources(id,name,kind,config,tier,enabled,participation_mode,interval_minutes) VALUES (${SOURCE_ID},'OKX fixture','external','{}','T2',true,'editorial',15)`;
+ await sql`INSERT INTO budgets(service,per_minute,per_hour,per_day) VALUES ('okx_news',50,500,1000)`;
+ const article=(n:number)=>({id:String(n),title:'比特币测试公告 '+n,summary:'比特币 ETF 发布最新申购数据。',sourceUrl:'https://example.org/crypto/'+n,timestamp:Date.now()-3600000,tokenSymbols:['BTC']});
+ const seen:string[]=[];
+ const first=await collectNews(true,async(_path,key)=>{seen.push(key.key);return {cursor:'older-archive',articles:[article(1)]};});
+ assert.equal(first.status,'ok');assert.equal('created' in first&&first.created,1);
+ const second=await collectNews(true,async(_path,key)=>{seen.push(key.key);return {cursor:null,articles:[article(1),article(2)]};});
+ assert.equal('duplicates' in second&&second.duplicates,1);assert.deepEqual(seen,['test-a','test-b']);
+ const bodies=await sql`SELECT id,body_status,body_text,url FROM articles WHERE source_id=${SOURCE_ID}`;
+ assert.equal(bodies.length,2);assert.ok(bodies.every(a=>a.body_status==='none'&&a.body_text===null));
+ const extraction=await sql`SELECT count(*) AS n FROM pgboss.job WHERE name='content.extract' AND data->>'articleId' IN ${sql(bodies.map(a=>a.id))}`;
+ assert.equal(Number(extraction[0].n),0);
+ await sql`UPDATE sources SET cursor=jsonb_set(cursor,'{coveredTo}',to_jsonb((cursor->>'coveredTo')::bigint-3600000)) WHERE id=${SOURCE_ID}`;
+ let failedPath='';
+ const failed=await collectNews(true,async(path,key)=>{failedPath=path;assert.equal(key.key,'test-a');throw new NewsApiError(429,'rate_limit');});
+ assert.equal(failed.status,'failed');
+ let calls=0;
+ const resumed=await collectNews(true,async(path,key)=>{
+  calls++;if(calls===1){assert.equal(path,failedPath);assert.equal(key.key,'test-b');return {cursor:'next-page',articles:[]};}
+  assert.equal(new URL('https://example.org'+path).searchParams.get('cursor'),'next-page');assert.equal(key.key,'test-a');return {cursor:'third-page',articles:[]};
+ });
+ assert.equal(resumed.status,'ok');
+ const [state]=await sql`SELECT cursor FROM sources WHERE id=${SOURCE_ID}`;
+ assert.equal(state.cursor.pageCursor,'third-page');assert.equal(state.cursor.inProgress,true);
+ await collectNews(true,async(path,key)=>{assert.equal(new URL('https://example.org'+path).searchParams.get('cursor'),'third-page');assert.equal(key.key,'test-b');return {cursor:null,articles:[]};});
+ const [finished]=await sql`SELECT cursor FROM sources WHERE id=${SOURCE_ID}`;assert.equal(finished.cursor.pageCursor,undefined);
+ await sql`UPDATE budgets SET per_minute=0 WHERE service='okx_news'`;
+ const stopped=await collectNews(true,async()=>{throw new Error('must not call provider');});assert.equal(stopped.status,'failed');assert.ok('error' in stopped&&stopped.error?.includes('Budget'));
+ await sql`UPDATE sources SET enabled=false WHERE id=${SOURCE_ID}`;
+ assert.equal((await collectNews(true,async()=>{throw Error('paused source called');})).status,'skipped');
+ const receipts=await sql`SELECT model,request FROM receipts WHERE service='okx_news'`;
+ assert.ok(receipts.some(r=>r.model==='A'));assert.ok(receipts.some(r=>r.model==='B'));
+ assert.ok(receipts.every(r=>!JSON.stringify(r.request).includes('test-a')&&!JSON.stringify(r.request).includes('secret-a')));
+});

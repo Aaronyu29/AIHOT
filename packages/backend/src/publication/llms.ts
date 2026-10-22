@@ -53,7 +53,7 @@ export function llmsTxt(opts: {
   const page = (name: string, path: string, covers: string | null) => `- [${name}](${u(path)})${covers ? `: ${covers}` : ""}`;
   // Examples use a real category: the second-to-last (papers in the AI pack).
   const sample = PUBLIC_API_CATEGORY_KEYS.at(-2) ?? PUBLIC_API_CATEGORY_KEYS[0];
-  const field = TOPIC_GROUPS.find((g) => g.key === "field")?.name ?? "方向";
+  const topicGroups = TOPIC_GROUPS.map((g) => g.name).join("、");
   const lines: string[] = [];
   lines.push(`# ${SITE.name}`, "");
   lines.push(`> ${SITE.description}`, "");
@@ -121,7 +121,7 @@ export function llmsTxt(opts: {
   lines.push(`- [主题](${u("/topics")}): 按${TOPIC_GROUPS.map((g) => g.name).join("、")}${subjectAfter("追踪", "最新动态")}${opts.topics.length ? `（${opts.topics.length} 个主题，下一节逐个列出）` : ""}`);
   lines.push(...opts.modules.pages);
   if (opts.topics.length) {
-    lines.push("", `## 主题：各公司与${field}的最新动态`, "");
+    lines.push("", `## 主题：${topicGroups}的最新动态`, "");
     lines.push(`每个主题页持续更新最新精选${opts.modules.topics.map((clause) => `；${clause}`).join("")}。`);
     lines.push("");
     for (const t of opts.topics) lines.push(`- [${t.name}](${u(`/topics/${t.slug}`)}): ${t.definition}`);
