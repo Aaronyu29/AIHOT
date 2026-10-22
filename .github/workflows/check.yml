@@ -68,6 +68,10 @@ jobs:
           /usr/lib/postgresql/17/bin/pg_restore --version
       - name: Typecheck
         run: npm run typecheck
+      - name: Release artifact guards
+        run: |
+          python3 -m py_compile scripts/deploy-ci.py deploy/install-ci-release.py
+          python3 deploy/test_ci_release.py
       - name: Build web
         run: npm run build -w @aihot/web
       - name: Browser test engines
@@ -111,13 +115,45 @@ jobs:
           # The smoke check reaches the site by its compose service name.
           echo "MCP_ALLOWED_HOSTS=web" >> .env
       - name: Build and start with docker compose
-        run: docker compose up -d --build
+        run: |
+          docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -t "aihot-app:$GITHUB_SHA" .
+          docker tag "aihot-app:$GITHUB_SHA" aihot-app
+          docker compose up -d --no-build
       - name: Smoke check
         run: |
           for i in $(seq 1 90); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 2; done
           docker compose ps
           docker compose run --rm --no-deps --entrypoint node setup scripts/smoke.ts --base http://web:3000
           docker compose exec -T db psql -U aihot -d aihot -Atc "select count(*) from sources" | grep -qx "$(node -p "require('./industry/sources.json').sources.length")"
+      - name: Export the tested release image
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          docker save "aihot-app:$GITHUB_SHA" | gzip -1 > "$RUNNER_TEMP/release/image.tar.gz"
+          cp deploy/install-ci-release.py "$RUNNER_TEMP/release/"
+          docker inspect --format '{{.Id}}' "aihot-app:$GITHUB_SHA" > "$RUNNER_TEMP/release/image-id.txt"
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'release'
+          (root / 'release.json').write_text(json.dumps({'sha': os.environ['GITHUB_SHA'], 'runId': os.environ['GITHUB_RUN_ID'], 'imageId': (root / 'image-id.txt').read_text().strip()}))
+          PY
+          cd "$RUNNER_TEMP/release"
+          sha256sum image.tar.gz install-ci-release.py release.json > SHA256SUMS
+      - name: Exercise the release installer on the throwaway site
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          mkdir -p .data
+          docker compose --profile https up -d --no-build caddy
+          python3 deploy/install-ci-release.py --root "$PWD" --bundle "$RUNNER_TEMP/release" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID"
+      - name: Keep the tested release image
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aihot-image-${{ github.sha }}
+          path: ${{ runner.temp }}/release/
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
       - name: Logs
         if: failure()
         run: docker compose logs --tail 80
