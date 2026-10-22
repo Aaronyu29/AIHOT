@@ -27,7 +27,7 @@ export async function analyzeFundingProjects(ask: AnalysisModel = analyze): Prom
       ORDER BY a.generated_at NULLS FIRST, p.id`;
     let attempts = 0;
     for (const project of await projectViews(rows)) {
-      if (!project.evidence.some(e => e.kind === 'funding') || project.analysis) continue;
+      if (project.reviewStatus !== 'approved' || !project.evidence.some(e => e.kind === 'funding') || project.analysis) continue;
       if (attempts++ >= 3) break;
       const hash = analysisHash(project);
       // At most three projects per schedule, with existing service budgets and durable paid receipts.
@@ -49,7 +49,7 @@ export async function analyzeFundingProjects(ask: AnalysisModel = analyze): Prom
         const stored = await sql.begin(async tx => {
           const [row] = await tx<ProjectRow[]>`SELECT * FROM rootdata_projects WHERE id = ${project.id} FOR UPDATE`;
           const current = row ? (await projectViews([row], tx))[0] : undefined;
-          if (!current || row.review_status !== 'approved' || row.tracking_status !== 'watching' || analysisHash(current) !== hash) {
+          if (!current || current.reviewStatus !== 'approved' || row.tracking_status !== 'watching' || analysisHash(current) !== hash) {
             if (result.receiptId !== null) await completeReceipt(tx, result.receiptId);
             return false;
           }

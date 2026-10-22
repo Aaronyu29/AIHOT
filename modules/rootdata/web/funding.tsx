@@ -34,7 +34,7 @@ export async function loader({ request }: LoaderArgs) {
 
 export const meta: MetaFunction<typeof loader> = ({ loaderData: data }) => pageMeta({
   title: data?.watching ? "我关注的项目" : "融资项目",
-  description: "从公开报道发现融资项目，结合 RootData 基础档案，查看跟踪依据、原文来源与后续进展。",
+  description: "由模型从公开报道筛选值得跟踪的融资项目，结合 RootData 基础档案，查看依据、来源与后续进展。",
   path: "/funding",
   noindex: !!(data?.watching || data?.q || data?.tag || (data?.page && data.page > 1)),
 });
@@ -99,7 +99,7 @@ export default function FundingPage() {
     <header className="pb-5 pt-3 lg:pt-1">
       <p className="mb-2 text-[11px] font-medium tracking-[0.12em] text-accent">项目观察</p>
       <h1 data-page-title="" className="text-[28px] font-semibold leading-tight text-ink">发现项目，跟进下一步</h1>
-      <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-ink-3">从公开报道发现融资线索，结合 RootData 项目档案，持续记录产品、合作与融资进展。</p>
+      <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-ink-3">模型从公开报道筛选值得跟踪的融资项目，结合 RootData 基础档案，随新动态持续重新评估。</p>
     </header>
     <div className="mb-6 rounded-card border border-line bg-surface px-4 py-3 text-[12px] leading-relaxed text-ink-3"><span className="font-medium text-ink-2">来源说明 · </span>{notice || "融资信息来自本站收录的公开报道；RootData 提供项目基础档案。覆盖范围取决于已接入信源。"}</div>
     <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -111,7 +111,7 @@ export default function FundingPage() {
     </div>
     {watching ? <WatchedProjects /> : <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[12px] text-ink-4"><p>{q || tag ? "筛选结果" : "正在跟踪"} <span className="num font-medium text-ink-2">{total}</span> 个项目{tag && ` · ${tag}`}</p>{(q || tag) && <Link to="/funding" className="text-accent">清除筛选</Link>}<span>按最新公开动态排序</span></div>
-      {items.length > 0 ? <ul className="grid gap-4 xl:grid-cols-2">{items.map((project) => <li key={project.id}><ProjectCard project={project} /></li>)}</ul> : <div className="card"><EmptyState title={q || tag ? "没有找到符合条件的项目" : page > 1 ? "这一页没有项目" : "融资项目正在准备中"} action={(q || tag || page > 1) ? <Link to="/funding" className={buttonClass()}>查看最新项目</Link> : <Link to="/all" className={buttonClass()}>先看最新动态</Link>}>{q || tag ? "试试项目的其他名称，或清除筛选条件。" : "等待信源同步与项目核对。融资线索确认后，会在这里展示报道来源和后续进展。"}</EmptyState></div>}
+      {items.length > 0 ? <ul className="grid gap-4 xl:grid-cols-2">{items.map((project) => <li key={project.id}><ProjectCard project={project} /></li>)}</ul> : <div className="card"><EmptyState title={q || tag ? "没有找到符合条件的项目" : page > 1 ? "这一页没有项目" : "融资项目正在准备中"} action={(q || tag || page > 1) ? <Link to="/funding" className={buttonClass()}>查看最新项目</Link> : <Link to="/all" className={buttonClass()}>先看最新动态</Link>}>{q || tag ? "试试项目的其他名称，或清除筛选条件。" : "公开报道同步后，模型会自动筛选并展示值得跟踪的项目。证据不足的线索保留为候选，待新资料到来后重新评估。"}</EmptyState></div>}
       {(page > 1 || page * PAGE_SIZE < total) && <nav aria-label="项目分页" className="mt-6 flex items-center justify-center gap-5">{page > 1 && <Link to={pageHref(page - 1)} className={buttonClass()}>上一页</Link>}<span className="num text-[13px] text-ink-4">第 {page} 页</span>{page * PAGE_SIZE < total && <Link to={pageHref(page + 1)} className={buttonClass()}>下一页</Link>}</nav>}
     </>}
   </div>;

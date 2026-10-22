@@ -5,10 +5,14 @@ import { adminHandler } from "../../apps/api/src/routes/admin-auth.ts";
 import { listFundingProjects, fundingProject } from "./publication.ts";
 import { listFundingAdmin, syncFundingProjects, updateFundingProject } from "./tracking.ts";
 import { analyzeFundingProjects } from './analysis.ts';
+import { reviewFundingProjects } from './review.ts';
 
 export default defineServerModule({
   name: "rootdata",
-  models: {rootdataAnalysis: {label: '融资项目分析（业务、所在链、宣发与前景）', env: 'ROOTDATA_ANALYSIS_MODEL', purposes: ['rootdata_project_analysis']}},
+  models: {
+    rootdataReview: {label: '融资候选自动审核', env: 'ROOTDATA_REVIEW_MODEL', purposes: ['rootdata_project_review']},
+    rootdataAnalysis: {label: '融资项目分析（业务、所在链、宣发与前景）', env: 'ROOTDATA_ANALYSIS_MODEL', purposes: ['rootdata_project_analysis']},
+  },
   http(app) {
     app.get("/api/site/funding-projects", async (request, reply) => {
       const parsed = z.object({ limit: z.coerce.number().int().min(1).max(100).optional(), offset: z.coerce.number().int().min(0).max(10000).optional(),
@@ -33,6 +37,7 @@ export default defineServerModule({
   },
   schedules: [
     { name: "rootdata.sync", cron: "*/15 * * * *", missed: "once", run: syncFundingProjects },
+    { name: "rootdata.review", cron: "2,17,32,47 * * * *", missed: "once", run: reviewFundingProjects },
     { name: "rootdata.analysis", cron: "7,22,37,52 * * * *", missed: "once", run: analyzeFundingProjects },
   ],
   admin: { counts: { funding: async () => (await listFundingAdmin()).items.filter((p) => p.reviewStatus === "pending").length } },
