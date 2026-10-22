@@ -67,7 +67,7 @@ test("without a reason the card goes from the summary straight to the buttons", 
 });
 
 test("markdown characters in the model's words show as written", async () => {
-  const card = await selected("paper", null, { title: "延迟 <1 秒的 *Flash* 模型", summary: "支持 [beta] 接口与 `code` 示例。" });
+  const card = await selected("tip", null, { title: "延迟 <1 秒的 *Flash* 模型", summary: "支持 [beta] 接口与 `code` 示例。" });
   assert.ok(card.body.elements[0].content.startsWith("**延迟 &#60;1 秒的 &#42;Flash&#42; 模型**"));
   assert.equal(card.body.elements[2].content, "支持 &#91;beta&#93; 接口与 &#96;code&#96; 示例。");
 });

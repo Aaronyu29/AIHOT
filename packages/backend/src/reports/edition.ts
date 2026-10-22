@@ -17,8 +17,8 @@ import { evidenceCondition, listedCondition, ownFactEvidenceCondition } from "..
 /** Each category's section; several categories may share one, in the order the pack lists them. */
 export const SECTION_OF: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.section]));
 export const SECTION_ORDER: readonly string[] = [...new Set(CATEGORIES.map((c) => c.section))];
-/** An item without a category goes into the section of the industry category, else into the last one. */
-const DEFAULT_SECTION = SECTION_OF.industry ?? SECTION_ORDER.at(-1)!;
+/** An item without a category goes into the general industry section, else the first field's section. */
+const DEFAULT_SECTION = SECTION_OF.industry ?? SECTION_ORDER[0]!;
 export const sectionOf = (category: string | null) => SECTION_OF[category ?? ""] ?? DEFAULT_SECTION;
 
 /** A daily's size: the entries readers get in full, and the one-line flashes after them. */

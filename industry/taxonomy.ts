@@ -12,12 +12,11 @@
  * feedLabel 是分类 RSS 标题里的名字（不写就用 label）。公开接口、RSS 和 MCP 里要把一类并进另一类发布，写在站点设置里（site/site.ts 的 PUBLIC_CATEGORIES）。
  */
 export const CATEGORIES = [
-  { key: "ai-models", tagColor: "indigo", label: "模型", feedLabel: "AI 模型", section: "模型发布/更新", guide: "模型本身的发布、版本、权重开放、能力或价格变化，以及既有榜单上的模型成绩。公布一次跑分不是发布新基准，也不是教程。" },
-  { key: "ai-products", tagColor: "turquoise", label: "产品", feedLabel: "AI 产品", section: "产品发布/更新", guide: "可使用的 AI 产品、功能、应用、工具、API、平台和工程组件的发布更新。模型厂商发布的推理框架、算子库、硬件适配组件仍是产品，不能因为厂商名归成模型。" },
-  { key: "industry", tagColor: "orange", label: "行业", feedLabel: "行业动态", section: "行业动态", guide: "已发生的公司经营、融资并购、人事、合作、诉讼、政策、真实安全事故及调查进展。新闻由当事人发帖、带有态度，也不因此变成观点。" },
-  { key: "paper", tagColor: "violet", label: "论文", feedLabel: "论文", section: "论文研究", guide: "以新研究方法、实验设计与发现为核心的论文、技术报告、新基准或研究数据集。系统性红队实验属于研究；既有榜单成绩归模型，真实事故的新闻调查归行业。" },
-  { key: "tip", tagColor: "green", label: "教程", section: "技巧与观点", guide: "读者可以照着使用的方法、提示词、工具用法、工程实践复盘与技术讲解。重点是可复用的做法；单纯发布工具归产品，只有态度和预测而无做法归观点。", commentary: true },
-  { key: "opinion", tagColor: "purple", label: "观点", section: "技巧与观点", guide: "重点是作者的解释、判断、主张、预测、评论或访谈观点。讨论市场不自动归行业，作者是名人不自动归观点。", commentary: true },
+  // Retain the two deployed URL/API identities; their reader-facing names and classification now follow this site's fields.
+  { key: "ai-models", tagColor: "indigo", label: "软件工程", feedLabel: "软件工程", section: "软件工程", guide: "软件、开发工具、开源项目、云原生、数据库、数据工程、Web、测试、软件安全及 AI 工程相关的发布、研究和行业新闻，包括这些领域的融资、政策与真实事故。区块链或加密业务是核心的归区块链；主要教读者做事的归教程，主要表达判断的归观点。" },
+  { key: "ai-products", tagColor: "turquoise", label: "区块链", feedLabel: "区块链", section: "区块链", guide: "公链、Layer2、协议、DeFi、钱包、稳定币、支付、RWA、交易平台、加密市场和链上安全的发布、研究与新闻，包括融资、监管、市场变化和真实事故。一般软件开发归软件工程；主要教读者操作的归教程，主要表达判断的归观点。不能因为使用 AI 或开源技术就把加密业务新闻归软件工程。" },
+  { key: "tip", tagColor: "green", label: "教程", section: "教程", guide: "软件工程或区块链领域中读者能照着操作、实现或复用的方法、工具用法、工程实践复盘与技术讲解。按内容形态优先于领域归类；单纯发布、研究发现或新闻归对应领域，只有判断预测而没有可复用做法归观点。", commentary: true },
+  { key: "opinion", tagColor: "purple", label: "观点", section: "观点", guide: "软件工程或区块链领域中以作者的解释、判断、主张、预测、评论或访谈观点为重点的内容。按内容形态优先于领域归类；已发生事件的新闻报道仍归对应领域，不能因作者是名人、报道带有态度或涉及市场就归观点。", commentary: true },
 ] as const satisfies ReadonlyArray<{ key: string; tagColor: string; label: string; feedLabel?: string; section: string; guide: string; commentary?: true }>;
 
 /**
@@ -25,7 +24,7 @@ export const CATEGORIES = [
  * category 是类别，tag 是标签，两者都对上才算；unit 接在数字后面。
  * 没有这样一类的行业设成 null，报头就不显示这个数。
  */
-export const RELEASE: { category: string; tag: string; unit: string } | null = { category: "ai-models", tag: "模型发布", unit: "个新模型" };
+export const RELEASE: { category: string; tag: string; unit: string } | null = null;
 
 /** 周报月报的总述可以直接写、不必在报道里找到出处的行业通用词（小写）。站名会自动算进去。 */
 export const PLAIN_TERMS: readonly string[] = ["ai", "api", "llm", "gpu", "agi", "ceo", "ipo"];
