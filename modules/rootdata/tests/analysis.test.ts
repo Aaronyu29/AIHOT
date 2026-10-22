@@ -40,6 +40,8 @@ test('analysis is cached, grounded in current evidence, and generation respects 
 });
 
 test('one failed project logs its cause and does not block the next analysis', async t => {
+  // The earlier correction fixture is intentionally stale; this run exercises only these two projects.
+  await sql`UPDATE rootdata_projects SET tracking_status='paused'`;
   const failed = await create('AnalysisFailed');
   const next = await create('AnalysisNext');
   const logs = t.mock.method(console, 'error', () => {});
