@@ -14,6 +14,8 @@ import { fetchDetail, fetchWebList, isCallToActionTitle, needsTitle, type Detail
 import { unsupportedConfig } from "./config-keys.ts";
 import { admitListing, filterPublicationWindow } from "./filters.ts";
 import { fetchJsonList } from "./json-list.ts";
+import { fetchTelegramPublic } from "./telegram.ts";
+import { fetchDefiLlamaRecent } from "./defillama.ts";
 import { fetchXSearch, planXShards, readXSearch, shardHandle, shardQuery, selfThreadHandle, SHARDABLE_SQL, tweetToCandidate, type XBacklog } from "./x.ts";
 import { FetchError, type Candidate, type SourceRow } from "./types.ts";
 
@@ -70,6 +72,8 @@ const detailRulesOf = (source: SourceRow) => (source.config.detail ? sha256(JSON
  */
 export async function listingEntries(source: SourceRow, found: Candidate[]): Promise<CollectionCandidate[]> {
   let candidates = admitListing(found, source);
+  if (source.config.fetchPublicContent === false) candidates = candidates.map(c =>
+    c.bodyText || c.bodyHtml ? c : { ...c, bodyStatus: "none" });
   if (source.kind === "json_list" && source.config.externalIdPath) candidates = await reuseExternalMaterialIdentities(source.id, candidates);
   if (source.config.sortByPublishedAt) candidates.sort((a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0));
   const unreliableDates = source.config.detail?.publishedAtAuthoritative === true;
@@ -94,7 +98,7 @@ export async function listingEntries(source: SourceRow, found: Candidate[]): Pro
 function admission(source: SourceRow, known: Map<string, StoredDetail>, firstImport: boolean) {
   const months = Number(source.config._aihot?.initialBackfillMonths ?? 12);
   const floor = firstImport ? Date.now() - months * 30 * DAY_MS
-    : source.kind === "x_search" ? null : Date.parse(String(source.cursor!.initializedAt)) - STALE_ON_DISCOVERY_MS;
+    : source.kind === "x_search" || ["telegram_public", "defillama_recent"].includes(source.config.adapter) ? null : Date.parse(String(source.cursor!.initializedAt)) - STALE_ON_DISCOVERY_MS;
   const byListing = (c: Candidate) => floor === null || !firstImport && known.has(c.identityKey!) || !(c.publishedAt && c.publishedAt.getTime() < floor);
   return { byListing, admits: (c: Candidate) => byListing(c) && filterPublicationWindow([c], source.config.publishedAfter).length > 0 };
 }
@@ -132,6 +136,7 @@ function fromStored(c: CollectionCandidate, stored: StoredDetail, source: Source
 /** What a detail page should add to an entry, or null when it would add nothing. */
 function detailNeed(c: CollectionCandidate, stored: StoredDetail | undefined, source: SourceRow, listingTitle: string): DetailNeed | null {
   const d = source.config.detail!;
+  if (d?.allowUrlPrefixes?.length && !d.allowUrlPrefixes.some((prefix: string) => c.url.startsWith(prefix))) return null;
   const storedHeadline = !!stored && isCallToActionTitle(listingTitle) && !isCallToActionTitle(stored.title);
   const need: DetailNeed = {
     date: d.publishedAtAuthoritative === true || !(stored?.published_at || c.publishedAt) || d.upgradeDatePrecision === true,
@@ -312,6 +317,16 @@ export async function collectSource(sourceId: string, opts: { force?: boolean; x
       else delete nextCursor.rss;
       if (rss.notModified) detail = { notModified: true, httpStatus: 304 };
     }
+    else if (source.kind === "web_list" && source.config.adapter === "telegram_public") {
+      const telegram = await fetchTelegramPublic(source);
+      candidates = telegram.candidates;
+      Object.assign(nextCursor, telegram.cursor);
+    }
+    else if (source.kind === "json_list" && source.config.adapter === "defillama_recent") {
+      const recent = await fetchDefiLlamaRecent(source);
+      candidates = recent.candidates;
+      Object.assign(nextCursor, recent.cursor);
+    }
     else if (source.kind === "web_list") candidates = await fetchWebList(source);
     else if (source.kind === "json_list") candidates = await fetchJsonList(source);
     else {
@@ -333,7 +348,7 @@ export async function collectSource(sourceId: string, opts: { force?: boolean; x
     const { byListing, admits } = admission(source, known, firstImport);
     candidates = candidates.filter(byListing);
     // First import of a new source: bounded, and archived by source time (never "today", never pushed).
-    if (firstImport) candidates = candidates.slice(0, Number(source.config._aihot?.initialBackfillLimit ?? 30));
+    if (firstImport && !["telegram_public", "defillama_recent"].includes(source.config.adapter)) candidates = candidates.slice(0, Number(source.config._aihot?.initialBackfillLimit ?? 30));
     const reads = await enrichDetails(candidates, source, known, {
       budget: Number(d?.maxFetches ?? 0), admits,
       after: source.cursor?.detailRules === rules ? source.cursor?.detailAfter : undefined,
