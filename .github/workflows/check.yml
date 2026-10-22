@@ -54,6 +54,9 @@ jobs:
       - name: PostgreSQL backup tools
         # 恢复测试需要与 PostgreSQL 17 服务匹配的客户端，不能依赖 runner 的默认版本。
         run: |
+          # The runner's Azure mirror repeatedly stalled dependency downloads; use Ubuntu's archive and bounded retries.
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          printf '%s\n' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' 'Acquire::Retries "2";' | sudo tee /etc/apt/apt.conf.d/99-ci-download-timeouts >/dev/null
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           . /etc/os-release
