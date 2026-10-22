@@ -109,7 +109,8 @@ export function llmsTxt(opts: {
   if (ACCESS.ratePerMinute) lines.push(`- 单个 IP 超过约每分钟 ${ACCESS.ratePerMinute} 次会收到 429；请按 Retry-After 等待，不要并发重试。`);
   lines.push("");
   lines.push("## 网站主要页面", "");
-  lines.push(`- [首页 · 精选](${u("/")}): ${subjectAfter("每日", "精选动态")}`);
+  lines.push(`- [首页 · 全部动态](${u("/")}): ${subjectAfter("全量", "资讯流")}`);
+  lines.push(`- [精选](${u("/featured")}): ${subjectAfter("每日", "精选动态")}`);
   lines.push(`- [${withSubject("热点榜")}](${u("/hot")}): 过去 48 小时内被多个独立信源${subjectAfter("共同讨论的", "事件")}；可进入事件页查看最新进展、热度变化、报道时间线和 AI 综述`);
   lines.push(`- [全部动态](${u("/all")}): ${subjectAfter("全量", "资讯流")}，可按分类筛选`);
   if (opts.hasDailies) {
