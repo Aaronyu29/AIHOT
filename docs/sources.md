@@ -4,6 +4,14 @@
 
 ## 六种信源
 
+本地站点的币圈新项目来源已配置在 `industry/sources.json`：Colosseum RSS、RootData 公开 Telegram、YZi Labs 与 EASY Residency、a16z CSX RSS 与公司目录、ETHGlobal Showcase、DefiLlama Recent；ESP 复用 Ethereum Foundation 源（不重复建源，也不排除 EF 的其他公告）。另扫描 CryptoMarketAggregator、groupdigest、wizzalert、BWEnews 的公开频道。DefiLlama Raises 暂不启用，未使用付费入口。
+
+`web_list` 的 `telegram_public` adapter 读取 `https://t.me/s/<channel>`，按 `?before=<消息ID>` 分页。`maxPages` 是每轮页数（1–20），`initialBackfillPages` 是首轮页数；增量超过页数时保存续页位置，扫描到旧边界才推进消息高水位。分页不前进、身份不符或请求失败保留原游标。配置在 `cursor.telegramPublic`；预览不保存它。发布时间只取消息自己的带时区 `time[datetime]`，引用公告在 `raw.announcementUrls`，不拿消息时间冒充公告原文时间。RootData 只收项目、融资和网络/代币发布，排除人事；新增四个频道交由现有内容流程判断相关性。
+
+`ethglobal_showcase`、`csx_accelerator`、`easy_residency` 是免费网页 adapter。缺少日期的项目原型、公司目录和季次落地页保留空值；初始存档不代表当日新发布。EASY 公告与 YZi 博客按原文 URL 合并。`json_list` 的 `defillama_recent` adapter 读取免费协议列表，`maxItems`（1–100）仅限制首轮回填，之后按稳定协议 ID 与 `listedAt` 增量发现；标题明确标注“新增收录”，此处的日期只表示收录事件，不表示项目上线。旧记录补齐字段不会被宣称为新项目。
+
+所有新源只提供标题、摘要与链接，`fetchPublicContent: false` 不发起正文补抓，也不调用付费渲染。`ingestNoiseFilter.requireAny` 可要求标题、摘要或分类至少命中一个关键词（大小写不敏感），与噪声排除同时生效；CSX RSS 用它筛选全站 feed。
+
 | 类型 | 适合 | 需要 |
 |---|---|---|
 | `rss` | 有 RSS / Atom 的博客、媒体、Substack、公众号转 RSS 服务 | 无 |

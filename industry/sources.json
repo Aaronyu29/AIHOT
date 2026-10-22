@@ -631,7 +631,8 @@
       "interval_minutes": 120,
       "tags": [
         "核心",
-        "额外补充-区块链原始资料"
+        "额外补充-区块链原始资料",
+        "ESP生态资助"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
@@ -652,6 +653,351 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false
+    },
+    {
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "rss-colosseum",
+      "name": "Colosseum",
+      "kind": "rss",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 15
+        },
+        "feedUrl": "https://blog.colosseum.com/rss/",
+        "fetchPublicContent": false,
+        "ingestNoiseFilter": {
+          "requireAny": [
+            "hackathon",
+            "accelerator",
+            "cohort",
+            "demo day",
+            "winner",
+            "winning"
+          ]
+        }
+      }
+    },
+    {
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 15,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "telegram-rootdata",
+      "name": "RootData",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://t.me/s/Rootdatalabs",
+        "adapter": "telegram_public",
+        "maxPages": 5,
+        "initialBackfillPages": 2,
+        "fetchPublicContent": false,
+        "ingestNoiseFilter": {
+          "requireAny": [
+            "[New Project",
+            "[New Fundraising",
+            "[New Mainnet",
+            "[New Testnet",
+            "[Token Launch",
+            "[Mainnet",
+            "[Testnet"
+          ],
+          "dropMarkersTitleOnly": [
+            "[New Job Dynamics",
+            "[Personnel",
+            "[Team Change"
+          ]
+        }
+      }
+    },
+    {
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "rss-a16z-csx",
+      "name": "a16z CSX",
+      "kind": "rss",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 15
+        },
+        "feedUrl": "https://a16zcrypto.com/feed.xml",
+        "fetchPublicContent": false,
+        "ingestNoiseFilter": {
+          "requireAny": [
+            "csx",
+            "crypto startup accelerator"
+          ]
+        }
+      }
+    },
+    {
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "yzilabs-projects",
+      "name": "YZi Labs",
+      "kind": "rss",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "feedUrl": "https://yzi-labs.ghost.io/rss/",
+        "itemUrlPrefixRewrite": {
+          "from": "https://yzi-labs.ghost.io/",
+          "to": "https://www.yzilabs.com/blog/"
+        },
+        "fetchPublicContent": false,
+        "publisherUrlPrefixes": [
+          "https://www.yzilabs.com/blog/"
+        ],
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "team update",
+            "joins YZi",
+            "appoints"
+          ]
+        }
+      }
+    },
+    {
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "yzi-easy-residency",
+      "name": "YZi Labs EASY Residency",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://www.yzilabs.com/easy-residency",
+        "adapter": "easy_residency",
+        "fetchPublicContent": false,
+        "detail": {
+          "allowUrlPrefixes": [
+            "https://www.yzilabs.com/blog/"
+          ],
+          "maxFetches": 8,
+          "titleSelector": "h1",
+          "titleAuthoritative": true,
+          "summarySelector": "meta[property='og:description']",
+          "publishedAtRegex": "\"published_at\":\"([^\"]+)\"",
+          "publishedAtAuthoritative": true
+        }
+      }
+    },
+    {
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "ethglobal-showcase",
+      "name": "ETHGlobal Showcase",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://ethglobal.com/showcase",
+        "adapter": "ethglobal_showcase",
+        "fetchPublicContent": false,
+        "publisherUrlPrefixes": [
+          "https://ethglobal.com/showcase/"
+        ]
+      }
+    },
+    {
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "a16z-csx-projects",
+      "name": "a16z CSX Projects",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 100,
+          "initialBackfillMonths": 12
+        },
+        "url": "https://a16zcrypto.com/accelerator/",
+        "adapter": "csx_accelerator",
+        "fetchPublicContent": false
+      }
+    },
+    {
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "区块链",
+        "新项目"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "defillama-recent",
+      "name": "DefiLlama 新增收录",
+      "kind": "json_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://api.llama.fi/protocols",
+        "adapter": "defillama_recent",
+        "maxItems": 20,
+        "fetchPublicContent": false
+      }
+    },
+    {
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 5,
+      "tags": [
+        "区块链",
+        "Telegram"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "telegram-cryptomarketaggregator",
+      "name": "CryptoMarketAggregator",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://t.me/s/CryptoMarketAggregator",
+        "adapter": "telegram_public",
+        "maxPages": 5,
+        "initialBackfillPages": 1,
+        "fetchPublicContent": false
+      }
+    },
+    {
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 5,
+      "tags": [
+        "区块链",
+        "Telegram"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "telegram-groupdigest",
+      "name": "groupdigest",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://t.me/s/groupdigest",
+        "adapter": "telegram_public",
+        "maxPages": 5,
+        "initialBackfillPages": 1,
+        "fetchPublicContent": false
+      }
+    },
+    {
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 5,
+      "tags": [
+        "区块链",
+        "Telegram"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "telegram-wizzalert",
+      "name": "wizzalert",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://t.me/s/wizzalert",
+        "adapter": "telegram_public",
+        "maxPages": 5,
+        "initialBackfillPages": 1,
+        "fetchPublicContent": false
+      }
+    },
+    {
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 5,
+      "tags": [
+        "区块链",
+        "Telegram"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "id": "telegram-bwenews",
+      "name": "BWEnews",
+      "kind": "web_list",
+      "config": {
+        "_aihot": {
+          "initialBackfillLimit": 30
+        },
+        "url": "https://t.me/s/BWEnews",
+        "adapter": "telegram_public",
+        "maxPages": 5,
+        "initialBackfillPages": 1,
+        "fetchPublicContent": false
+      }
     }
   ]
 }

@@ -12,6 +12,8 @@ import { republishKey, requestRepublish } from "../jobs/publication.ts";
 import { normalizeUrl } from "../lib/url.ts";
 import { serverModules } from "../modules.ts";
 import { fetchJsonList } from "../sources/json-list.ts";
+import { fetchTelegramPublic } from "../sources/telegram.ts";
+import { fetchDefiLlamaRecent } from "../sources/defillama.ts";
 import { fetchRss } from "../sources/rss.ts";
 import { assertSupportedConfig, UnsupportedConfig } from "../sources/config-keys.ts";
 import { enrichDetails, listingEntries, storedDetails } from "../sources/collect.ts";
@@ -89,6 +91,8 @@ export async function previewSource(draft: Pick<SourceRow, "id" | "kind" | "conf
   const started = performance.now();
   let found;
   if (source.kind === "rss") found = (await fetchRss(source, { force: true })).candidates;
+  else if (source.kind === "web_list" && source.config.adapter === "telegram_public") found = (await fetchTelegramPublic(source)).candidates;
+  else if (source.kind === "json_list" && source.config.adapter === "defillama_recent") found = (await fetchDefiLlamaRecent(source)).candidates;
   else if (source.kind === "web_list") found = await fetchWebList(source);
   else if (source.kind === "json_list") found = await fetchJsonList(source);
   else if (source.kind === "x_search") found = (await fetchXSearch(source)).candidates;

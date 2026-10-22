@@ -16,9 +16,21 @@ import { unsupportedConfig } from "@aihot/backend/sources/config-keys";
 import { fetchDetail, fetchWebList, fromHtml, fromMarkdown } from "@aihot/backend/sources/web-list";
 import { fetchRss } from "@aihot/backend/sources/rss";
 import { fetchJsonList } from "@aihot/backend/sources/json-list";
+import { fetchTelegramPublic, parseTelegramPublic } from "@aihot/backend/sources/telegram";
 import { noiseFiltered } from "@aihot/backend/sources/filters";
 
 const source = (config: Record<string, unknown>) => ({ id: "test-list", config }) as never;
+
+function telegramPage(ids: number[], before?: number) {
+  return `<html><head><link rel="canonical" href="/s/Rootdatalabs?before=${Math.max(...ids) + 1}">` +
+    (before ? `<link rel="prev" href="/s/Rootdatalabs?before=${before}">` : "") + `</head><body>` +
+    (before ? `<a data-before="${before}" href="/s/Rootdatalabs?before=${before}"></a>` : "") +
+    ids.map(id => `<div class="tgme_widget_message" data-post="Rootdatalabs/${id}">` +
+      `<div class="tgme_widget_message_text"><b>[New Fundraising] Project ${id}</b><br>Project ${id} builds developer tools.<br>` +
+      `More about Project: <a href="https://example.org/project/${id}">Details</a><br>` +
+      `Source: <a href="https://example.org/announcement/${id}">Official announcement</a></div>` +
+      `<a class="tgme_widget_message_date" href="https://t.me/Rootdatalabs/${id}"><time datetime="2026-10-21T09:15:00+00:00">09:15</time></a></div>`).join("") + `</body></html>`;
+}
 
 const pages: Record<string, () => string> = {
   // A news site's feed: a teaser that ends in "Read the full story", next to a post whose feed carries it whole.
@@ -75,6 +87,104 @@ await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve
 const site = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 config.allowPrivateNetworkFetch = true;
 after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+test("Telegram preview preserves its message date and separately identifies cited announcements", () => {
+  const parsed = parseTelegramPublic(telegramPage([102, 101], 101), "https://t.me/s/Rootdatalabs");
+  const candidate = parsed.messages[0]!.candidate!;
+  assert.equal(candidate.title, "[New Fundraising] Project 102");
+  assert.match(candidate.excerpt!, /^Project 102 builds developer tools\./);
+  assert.equal(candidate.url, "https://t.me/Rootdatalabs/102");
+  assert.equal(candidate.publishedAt?.toISOString(), "2026-10-21T09:15:00.000Z");
+  assert.deepEqual(candidate.raw, {
+    telegramMessageUrl: candidate.url, telegramMessageId: 102, telegramChannel: "Rootdatalabs",
+    publicationTimeSource: "telegram_message",
+    linkedUrls: ["https://example.org/project/102", "https://example.org/announcement/102"],
+    announcementUrls: ["https://example.org/announcement/102"],
+  });
+  assert.equal(candidate.bodyStatus, "none");
+  assert.equal(candidate.bodyHtml, undefined);
+  assert.equal(candidate.bodyText, undefined);
+  assert.equal(parsed.nextBefore, 101, "the canonical before=103 is not pagination");
+  for (const time of ["", "2026-10-21T09:15:00", "2026-02-30T09:15:00Z"]) {
+    const html = telegramPage([102]).replace("2026-10-21T09:15:00+00:00", time);
+    const undated = parseTelegramPublic(html, "https://t.me/s/Rootdatalabs").messages[0]!.candidate!;
+    assert.equal(undated.publishedAt, null, "no inferred date or fetch timestamp");
+    assert.equal(undated.publicationTime, null);
+  }
+});
+
+test("Telegram validates channel identity, permalink and pagination instead of accepting unrelated pages", () => {
+  assert.throws(() => parseTelegramPublic("<html>Join Telegram</html>", "https://t.me/s/Rootdatalabs"), /no message identities/);
+  assert.throws(() => parseTelegramPublic(telegramPage([102]).replace('data-post="Rootdatalabs/102"', 'data-post="Other/102"'), "https://t.me/s/Rootdatalabs"), /message identity/);
+  assert.throws(() => parseTelegramPublic(telegramPage([102]).replace('href="https://t.me/Rootdatalabs/102"', 'href="https://t.me/Other/102"'), "https://t.me/s/Rootdatalabs"), /permalink/);
+  assert.throws(() => parseTelegramPublic(telegramPage([102, 102]), "https://t.me/s/Rootdatalabs"), /duplicate/);
+  assert.throws(() => parseTelegramPublic(telegramPage([102], 103), "https://t.me/s/Rootdatalabs"), /previous-page boundary/);
+  assert.throws(() => parseTelegramPublic(telegramPage([102], 99), "https://t.me/s/Rootdatalabs"), /previous-page boundary/);
+});
+
+test("Telegram digest parts keep their number and a readable title while service notices add no duplicate article", () => {
+  const paragraph = "A project launches a new developer platform. ".repeat(70);
+  const html = telegramPage([103, 102]).replace("[New Fundraising] Project 103", "[3/3]")
+    .replace("Project 103 builds developer tools.", paragraph)
+    .replace('class="tgme_widget_message" data-post="Rootdatalabs/102"', 'class="tgme_widget_message service_message" data-post="Rootdatalabs/102"');
+  const parsed = parseTelegramPublic(html, "https://t.me/s/Rootdatalabs");
+  assert.match(parsed.messages[0]!.candidate!.title, /^\[3\/3\] A project launches/);
+  assert.equal(parsed.messages[0]!.candidate!.excerpt!.length, 2000);
+  assert.match(parsed.messages[0]!.candidate!.excerpt!, /^A project launches/);
+  assert.equal(parsed.messages[1]!.candidate, null, "the service message still contributes its ID to pagination");
+  const singleLine = parseTelegramPublic(telegramPage([104]).replace("[New Fundraising] Project 104", paragraph), "https://t.me/s/Rootdatalabs").messages[0]!.candidate!;
+  assert.equal(singleLine.title.length, 160);
+  assert.equal(singleLine.excerpt!.length, 2000, "a long single-line message keeps its content as the summary");
+  assert.ok(singleLine.excerpt!.endsWith("Source: https://example.org/announcement/104"), "the complete cited URL survives a truncated summary");
+  const decorated = telegramPage([105]).replace("[New Fundraising] Project 105", "━━━━━━━━━━<br>📋 每日情报")
+    .replace("Official announcement", "https://example.org/announcement/105");
+  const digest = parseTelegramPublic(decorated, "https://t.me/s/Rootdatalabs").messages[0]!.candidate!;
+  assert.equal(digest.title, "📋 每日情报", "skip decorative rules while preserving meaningful emoji text");
+  assert.equal(digest.excerpt!.split("https://example.org/announcement/105").length, 2, "a citation already printed as a URL appears once");
+});
+
+test("Telegram bounds initial history and resumes incremental gaps without advancing over missing pages", async () => {
+  pages["/s/Rootdatalabs"] = () => telegramPage([106, 105], 105);
+  pages["/s/Rootdatalabs?before=105"] = () => telegramPage([104, 103], 103);
+  pages["/s/Rootdatalabs?before=103"] = () => telegramPage([102, 101], 101);
+  pages["/s/Rootdatalabs?before=101"] = () => telegramPage([100, 99], 99);
+  const base = { id: "telegram", config: { url: `${site}/s/Rootdatalabs`, maxPages: 2, initialBackfillPages: 1 }, cursor: null };
+  const initial = await fetchTelegramPublic(base as never);
+  assert.deepEqual(initial.candidates.map(c => c.title), ["[New Fundraising] Project 106", "[New Fundraising] Project 105"]);
+  assert.deepEqual(initial.cursor.telegramPublic, { channel: "Rootdatalabs", highWaterId: 106, pendingBefore: null, pendingHighWaterId: null });
+  const saved = { telegramPublic: { channel: "Rootdatalabs", highWaterId: 100, pendingBefore: null, pendingHighWaterId: null } };
+  const prior = structuredClone(saved);
+  const first = await fetchTelegramPublic({ ...base, cursor: saved } as never);
+  assert.deepEqual(saved, prior, "fetch never mutates the stored cursor");
+  assert.deepEqual(first.cursor.telegramPublic, { channel: "Rootdatalabs", highWaterId: 100, pendingBefore: 103, pendingHighWaterId: 106 });
+  pages["/s/Rootdatalabs"] = () => telegramPage([108, 107, 106], 106);
+  const second = await fetchTelegramPublic({ ...base, cursor: first.cursor } as never);
+  assert.deepEqual(second.cursor.telegramPublic, { channel: "Rootdatalabs", highWaterId: 106, pendingBefore: null, pendingHighWaterId: null });
+  const third = await fetchTelegramPublic({ ...base, cursor: second.cursor } as never);
+  assert.equal(third.cursor.telegramPublic.highWaterId, 108);
+  const urls = [...first.candidates, ...second.candidates, ...third.candidates].map(c => c.url).sort();
+  assert.deepEqual(urls, Array.from({ length: 8 }, (_, i) => `https://t.me/Rootdatalabs/${101 + i}`));
+});
+
+test("Telegram failed and repeated pages preserve the old cursor and can be retried", async () => {
+  pages["/s/Rootdatalabs"] = () => telegramPage([106, 105], 105);
+  delete pages["/s/Rootdatalabs?before=105"];
+  const input = { id: "telegram", config: { url: `${site}/s/Rootdatalabs`, maxPages: 2 },
+    cursor: { initializedAt: "2026-10-01T00:00:00Z", telegramPublic: { channel: "Rootdatalabs", highWaterId: 100, pendingBefore: null, pendingHighWaterId: null } } };
+  const prior = structuredClone(input.cursor);
+  await assert.rejects(fetchTelegramPublic(input as never), /404/);
+  assert.deepEqual(input.cursor, prior);
+  pages["/s/Rootdatalabs?before=105"] = () => telegramPage([106, 105], 105);
+  await assert.rejects(fetchTelegramPublic(input as never), /pagination did not advance/);
+  assert.deepEqual(input.cursor, prior);
+  pages["/s/Rootdatalabs?before=105"] = () => telegramPage([104, 103]);
+  await assert.rejects(fetchTelegramPublic(input as never), /history boundary unavailable/);
+  assert.deepEqual(input.cursor, prior, "a missing pagination link cannot silently skip the old boundary");
+  pages["/s/Rootdatalabs?before=105"] = () => telegramPage([104, 103, 102, 101, 100]);
+  const retried = await fetchTelegramPublic(input as never);
+  assert.equal(retried.candidates.length, 6);
+  assert.equal(retried.cursor.telegramPublic.highWaterId, 106);
+});
 
 test("Jina card links become posts with their own titles", () => {
   const md = [
@@ -242,6 +352,13 @@ test("noise words match whatever their case", () => {
   assert.equal(noiseFiltered(c("Manus：正组建团队开发面向国内市场的产品", "与笔记本厂商合作的 Agent 产品"), source), false);
   assert.equal(noiseFiltered(c("新款笔记本开售", "首发价 4999 元"), source), true);
   assert.equal(noiseFiltered(c("iPhone 18 开售", ""), source), true);
+});
+
+test("required source markers inspect supplied RSS content and cannot be bypassed by noise exemptions", () => {
+  const rules = source({ ingestNoiseFilter: { requireAny: ["csx", "demo day"], keepIfMatches: ["announcement"] } });
+  assert.equal(noiseFiltered({ url: "https://example.org/a", title: "Weekly digest", bodyText: "Watch the Cohort V Demo Day." }, rules), false);
+  assert.equal(noiseFiltered({ url: "https://example.org/b", title: "An unrelated announcement" }, rules), true);
+  assert.equal(noiseFiltered({ url: "https://example.org/c", title: "Meet the teams", categories: ["CSX"] }, rules), false);
 });
 
 test("a time without a zone is read in the source's offset, in JSON lists and in detail page metadata", async () => {
