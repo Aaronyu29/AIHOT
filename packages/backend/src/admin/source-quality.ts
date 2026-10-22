@@ -2,7 +2,7 @@
 // repeated fetches are not repeated news, and unfinished analysis/grouping is not a failed judgement.
 import type { AdminSourceQuality, SourceQualityWindow } from "@aihot/contracts/admin";
 import { sql } from "../db.ts";
-import { seatedCondition } from "../publication/scope.ts";
+import { compositeScopeCondition, seatedCondition } from "../publication/scope.ts";
 import { budgetMessage } from "../providers/receipts.ts";
 
 const emptyQuality = (): AdminSourceQuality => ({
@@ -23,7 +23,7 @@ export async function sourceQuality(sourceIds: string[], days: SourceQualityWind
     sql<Array<{ source_id: string } & Pick<AdminSourceQuality, "received" | "processed" | "effective" | "blocked" | "pending" | "failed" | "backfill" | "pendingGrouping" | "selectionEvaluated" | "selected" | "duplicateEvaluated" | "duplicates">>>`
       WITH cohort AS MATERIALIZED (
         SELECT a.id,a.source_id,a.discovered_at,a.revision,a.backfill,a.processing_state,a.grouping_status,
-          an.id AS analysis_id,an.relevance,an.output->>'scope' AS scope,
+          an.id AS analysis_id,an.relevance,${compositeScopeCondition(sql`an.output`)} AS composite,
           a.processing_state IN ('analyzed','blocked','skipped') AND an.relevance IN ('pass','block') AS processed
         FROM articles a
         LEFT JOIN LATERAL (
@@ -35,7 +35,7 @@ export async function sourceQuality(sourceIds: string[], days: SourceQualityWind
         JOIN fact_articles fa ON fa.article_id=c.id JOIN facts f ON f.id=fa.fact_id
         LEFT JOIN stories st ON st.id=f.story_id
         WHERE c.processed AND c.relevance='pass' AND NOT c.backfill AND c.grouping_status='complete'
-          AND c.scope IS DISTINCT FROM 'composite' AND fa.role IN ('primary','report')
+          AND NOT c.composite AND fa.role IN ('primary','report')
           AND (st.id IS NULL OR st.merged_into IS NULL)
       ), related_articles AS MATERIALIZED (
         SELECT DISTINCT fa.article_id FROM candidate_facts cf JOIN fact_articles fa ON fa.fact_id=cf.fact_id
@@ -52,7 +52,7 @@ export async function sourceQuality(sourceIds: string[], days: SourceQualityWind
         SELECT c.id,c.source_id,m.fact_id
         FROM cohort c JOIN memberships m ON m.article_id=c.id
         WHERE c.processed AND c.relevance='pass' AND NOT c.backfill AND c.grouping_status='complete'
-          AND c.scope IS DISTINCT FROM 'composite'
+          AND NOT c.composite
       ), first_reports AS (
         -- The first eligible report is global and may predate this window or come from another source.
         SELECT DISTINCT ON (m.fact_id) m.fact_id,a.id
@@ -62,7 +62,7 @@ export async function sourceQuality(sourceIds: string[], days: SourceQualityWind
           SELECT relevance,output FROM analyses WHERE article_id=a.id AND input_revision=a.revision ORDER BY id DESC LIMIT 1
         ) an ON true
         WHERE NOT a.backfill AND a.grouping_status='complete' AND a.processing_state IN ('analyzed','blocked','skipped')
-          AND an.relevance='pass' AND an.output->>'scope' IS DISTINCT FROM 'composite' AND a.discovered_at <= ${observedAt}
+          AND an.relevance='pass' AND NOT ${compositeScopeCondition(sql`an.output`)} AND a.discovered_at <= ${observedAt}
         ORDER BY m.fact_id,a.discovered_at,a.id
       )
       SELECT c.source_id,count(*)::int AS received,

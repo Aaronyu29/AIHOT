@@ -42,9 +42,14 @@ export function seatedCondition(now: Date) {
   return sql`p.visibility = 'public' AND p.selected AND p.seat AND p.visible_after <= ${now}`;
 }
 
+/** The composite rule for a chosen analysis output; callers choose its revision and missing scope is unknown. */
+export function compositeScopeCondition(output: ReturnType<typeof sql>) {
+  return sql`((${output})->>'scope' = 'composite') IS TRUE`;
+}
+
 /** The report was published from a composite (multi-topic) analysis: it only mentions facts. */
 export function compositeCondition() {
-  return sql`EXISTS (SELECT 1 FROM analyses evidence_an WHERE evidence_an.id = p.analysis_id AND evidence_an.output->>'scope' = 'composite')`;
+  return sql`EXISTS (SELECT 1 FROM analyses evidence_an WHERE evidence_an.id = p.analysis_id AND ${compositeScopeCondition(sql`evidence_an.output`)})`;
 }
 
 /**
@@ -54,9 +59,9 @@ export function compositeCondition() {
  * also meets reports without a publication. Missing scope is unknown, never composite.
  */
 export function latestCompositeCondition(article: ReturnType<typeof sql>) {
-  return sql`(SELECT scope_analysis.output->>'scope' = 'composite' FROM analyses scope_analysis
+  return compositeScopeCondition(sql`(SELECT scope_analysis.output FROM analyses scope_analysis
     WHERE scope_analysis.article_id = ${article}
-    ORDER BY scope_analysis.input_revision DESC, scope_analysis.id DESC LIMIT 1) IS TRUE`;
+    ORDER BY scope_analysis.input_revision DESC, scope_analysis.id DESC LIMIT 1)`);
 }
 
 /**

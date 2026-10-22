@@ -39,8 +39,8 @@ async function qualityArticle(id: string, source: string, options: {
 async function qualityPublication(id: string, analysis: number, options: {
   visibility?: string; revision?: number; seat?: boolean; visibleAfter?: Date;
 } = {}) {
-  await sql`INSERT INTO publications (article_id,analysis_id,revision,visibility,eligible,selected,seat,title,source_id,channel,url,discovered_at,timeline_at,visible_after)
-    SELECT id,${analysis},${options.revision ?? 1},${options.visibility ?? "public"},true,true,${options.seat ?? true},title,source_id,'news',url,discovered_at,timeline_at,${options.visibleAfter ?? daysAgo(1)}
+  await sql`INSERT INTO publications (article_id,analysis_id,revision,visibility,eligible,selected,seat,title,source_id,channel,url,discovered_at,timeline_at,sort_at,visible_after)
+    SELECT id,${analysis},${options.revision ?? 1},${options.visibility ?? "public"},true,true,${options.seat ?? true},title,source_id,'news',url,discovered_at,timeline_at,timeline_at,${options.visibleAfter ?? daysAgo(1)}
     FROM articles WHERE id=${id}`;
 }
 
@@ -108,6 +108,14 @@ test("repeated reporting follows the global first report of a fact, not the stor
   await report("backfill", "shared", { backfill: true });
   await report("mention", "shared", {}, "mention");
   await report("composite", "shared", { scope: "composite" });
+  // Scope follows the current revision's newest analysis, even when other revisions have later ids.
+  await sql`UPDATE articles SET revision=2 WHERE id='quality-repeat-different-fact'`;
+  await sql`INSERT INTO analyses (article_id,input_revision,origin,relevance,output) VALUES
+    ('quality-repeat-different-fact',1,'rule','pass','{"scope":"composite"}'),
+    ('quality-repeat-different-fact',2,'rule','pass','{"scope":"single"}'),
+    ('quality-repeat-different-fact',3,'rule','pass','{"scope":"composite"}'),
+    ('quality-repeat-historical-first',2,'rule','pass','{"scope":"composite"}'),
+    ('quality-repeat-composite',2,'rule','pass','{"scope":"single"}')`;
   await report("group-pending", "shared", { grouping: "pending" });
   await report("blocked", "shared", { state: "blocked", relevance: "block" });
   await report("stale", "shared", { revision: 2, inputRevision: 1 });
