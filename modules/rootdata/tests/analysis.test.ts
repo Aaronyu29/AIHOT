@@ -38,6 +38,24 @@ test('analysis is cached, grounded in current evidence, and generation respects 
   await sql`UPDATE publications SET summary = 'The financing report was corrected.', revision = revision + 1 WHERE article_id = ${item.articleId}`;
   assert.equal(await fundingProject(item.id), null);
 });
+
+test('one failed project logs its cause and does not block the next analysis', async t => {
+  const failed = await create('AnalysisFailed');
+  const next = await create('AnalysisNext');
+  const logs = t.mock.method(console, 'error', () => {});
+  const result = await analyzeFundingProjects(async project => {
+    if (project.id === failed.id) throw new Error('synthetic model transport failure');
+    return answer(project);
+  });
+  assert.equal(result.failed, 1);
+  assert.equal(result.updated, 1);
+  assert.ok((await fundingProject(next.id))?.analysis);
+  const entry = logs.mock.calls.map(c => JSON.parse(String(c.arguments[0]))).find(e => e.projectId === failed.id);
+  assert.equal(entry.job, 'rootdata.analysis');assert.equal(entry.stage, 'model');
+  assert.equal(entry.err.message, 'synthetic model transport failure');assert.match(entry.err.stack, /at /);
+  const [row] = await sql`SELECT last_error,next_attempt_at FROM rootdata_analyses WHERE project_id=${failed.id}`;
+  assert.ok(row.last_error);assert.ok(row.next_attempt_at > new Date());
+});
 test('a withdrawal while the model is running cannot publish the now unsupported analysis', async () => {
   const item = await create('AnalysisBeta');
   const result = await analyzeFundingProjects(async project => {
@@ -48,4 +66,13 @@ test('a withdrawal while the model is running cannot publish the now unsupported
   assert.equal(await fundingProject(item.id), null);
   const [row] = await sql`SELECT output FROM rootdata_analyses WHERE project_id = ${item.id}`;
   assert.equal(row.output, null);
+});
+
+test('analysis returns its reserved connection even when unlock fails', async t => {
+  let queries=0,released=0;
+  const failure=new Error('analysis unlock connection lost');
+  const connection=Object.assign(async()=>{if(++queries>1)throw failure;return [{locked:true}];},{release:()=>{released++;}});
+  const mocked=t.mock.method(sql,'reserve',async()=>connection as unknown as Awaited<ReturnType<typeof sql.reserve>>);
+  try{await assert.rejects(analyzeFundingProjects(answer),error=>error===failure);}finally{mocked.mock.restore();}
+  assert.equal(released,1);
 });

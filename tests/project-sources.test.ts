@@ -69,7 +69,8 @@ async function createSource(name: string, kind: string, settings: Record<string,
 const stored = (id: string) => sql`SELECT id,url,published_at,publication_time,body_status,body_text,body_html FROM articles WHERE source_id=${id} ORDER BY url`;
 const cursor = async (id: string) => (await sql`SELECT cursor FROM sources WHERE id=${id}`)[0]!.cursor;
 
-test("Telegram collection commits all bounded first-import pages, preserves its cursor on failure, and replays without duplicates", async () => {
+test("Telegram collection commits all bounded first-import pages, preserves its cursor on failure, and replays without duplicates", async (t) => {
+  const logs = t.mock.method(console, "error", () => {});
   const id = await createSource("telegram", "web_list", { url: `${base}/s/${channel}`, adapter: "telegram_public",
     maxPages: 2, initialBackfillPages: 2, fetchPublicContent: false, _aihot: { initialBackfillLimit: 1 } });
   const first = await collectSource(id, { force: true });
@@ -93,6 +94,11 @@ test("Telegram collection commits all bounded first-import pages, preserves its 
   const failed = await collectSource(id, { force: true });
   assert.equal(failed.status, "failed");
   assert.match(failed.error ?? "", /403/);
+  const logged = logs.mock.calls.map(c => JSON.parse(String(c.arguments[0]))).find(e => e.sourceId === id);
+  assert.equal(logged.msg, "source collection failed");
+  assert.ok(Number.isSafeInteger(logged.runId));
+  assert.equal(logged.err.status, 403);
+  assert.match(logged.err.stack, /at /);
   assert.deepEqual(await cursor(id), checkpoint, "no successful-page watermark may escape a later page failure");
   assert.equal((await stored(id)).length, 4);
   failSecondPage = false;

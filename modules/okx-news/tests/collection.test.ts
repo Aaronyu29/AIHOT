@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {after,test} from 'node:test';
 import {sql,closeDb} from '@aihot/backend/db';
 import {stopBoss} from '@aihot/backend/jobs/queue';
-import {collectNews,SOURCE_ID} from '../server.ts';
+import module, {collectNews,SOURCE_ID} from '../server.ts';
+import {recordRun} from '@aihot/backend/jobs/queue';
 import {NewsApiError} from '../client.ts';
 process.env.COLLECT_ENABLED='true';
 process.env.OKX_NEWS_PROJECTS_JSON=JSON.stringify([{id:'A',key:'test-a',secret:'secret-a',passphrase:'pass-a'},{id:'B',key:'test-b',secret:'secret-b',passphrase:'pass-b'}]);
@@ -42,4 +43,21 @@ test('incremental collection rotates projects, deduplicates, resumes pages and p
  const receipts=await sql`SELECT model,request FROM receipts WHERE service='okx_news'`;
  assert.ok(receipts.some(r=>r.model==='A'));assert.ok(receipts.some(r=>r.model==='B'));
  assert.ok(receipts.every(r=>!JSON.stringify(r.request).includes('test-a')&&!JSON.stringify(r.request).includes('secret-a')));
+});
+
+test('invalid optional credentials fail their scheduled task without aborting worker registration',async t=>{
+ const saved=process.env.OKX_NEWS_PROJECTS_JSON;
+ t.after(()=>{process.env.OKX_NEWS_PROJECTS_JSON=saved;});
+ const logs=t.mock.method(console,'error',()=>{});
+ process.env.OKX_NEWS_PROJECTS_JSON='{synthetic-private-credential';
+ const schedule=module.schedules![0]!;
+ assert.equal(schedule.when!(),true);
+ await assert.rejects(recordRun(schedule.name,schedule.run),/Invalid OKX news credential pool/);
+ const [run]=await sql`SELECT status FROM job_runs WHERE job=${schedule.name} ORDER BY id DESC LIMIT 1`;
+ assert.equal(run.status,'failed');
+ const text=logs.mock.calls.map(c=>String(c.arguments[0])).join('\n');
+ assert.match(text,/okx-news.collect/);assert.match(text,/at /);
+ assert.ok(!text.includes('synthetic-private-credential'));
+ process.env.OKX_NEWS_PROJECTS_JSON=saved;
+ assert.equal(await recordRun('unrelated-task',async()=>42),42);
 });

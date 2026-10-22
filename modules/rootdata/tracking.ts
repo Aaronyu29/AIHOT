@@ -2,9 +2,10 @@ import { z } from "zod";
 import { sql, type Db } from "@aihot/backend/db";
 import { audit, Conflict } from "@aihot/backend/audit";
 import { credential } from "@aihot/backend/config";
+import { logTaskError } from "@aihot/backend/lib/log-error";
 import { sha256 } from "@aihot/backend/lib/ids";
 import { readPublishedEvidence } from "@aihot/backend/publication/module-evidence";
-import { BudgetExceededError, completeReceipt, paidRequest, ProviderRejectedError, type ReceiptResult } from "@aihot/backend/providers/receipts";
+import { BudgetExceededError, completeReceipt, paidRequest, ProviderRejectedError, failureKind, failedReceiptId, type ReceiptResult } from "@aihot/backend/providers/receipts";
 import { getProject, getQuota, RootDataError, searchProjects, uniqueExactProject, type RootDataProject, type RootDataQuota, type RootDataSearchResult } from "./client.ts";
 import { projectViews, type ProjectRow } from "./publication.ts";
 import { fundingCandidateName, mentionsProject, normalizedProjectName } from "./rules.ts";
@@ -69,7 +70,8 @@ async function recordedCall<T>(endpoint: string, identity: object, account: stri
       catch (error) {
         if (error instanceof RootDataError && error.status !== null &&
           (error.status < 200 || error.status >= 300 || (error.code !== null && error.code !== 200))) {
-          throw new ProviderRejectedError(error.message, error.status, error.retryable, [401, 403].includes(error.status) || [401, 403].includes(error.code ?? 0));
+          throw Object.assign(new ProviderRejectedError(error.message, error.status, error.retryable, [401, 403].includes(error.status) || [401, 403].includes(error.code ?? 0)),
+            { code: error.code === null ? undefined : String(error.code) });
         }
         throw error;
       }
@@ -163,6 +165,8 @@ export async function enrichFundingProjects(remote: RootDataProvider = provider)
       });
       if (updated) refreshed += 1;
     } catch (error) {
+      logTaskError(error, { msg: "funding refresh failed", job: "rootdata.sync", projectId: row.id,
+        kind: failureKind(error), receiptId: failedReceiptId(error), level: error instanceof BudgetExceededError ? "warn" : "error" });
       const message = error instanceof BudgetExceededError ? error.message : "RootData 同步未完成，请检查运行回执后重试";
       await sql`UPDATE rootdata_projects SET last_error = ${message}, updated_at = now() WHERE id = ${row.id} AND version = ${row.version}`;
       if (error instanceof BudgetExceededError) return { refreshed, skipped: message };
@@ -177,15 +181,20 @@ export async function syncFundingProjects() {
   // Multiple worker processes can receive a schedule; a session lock covers the network phase too.
   const connection = await sql.reserve();
   const lock = "rootdata.sync";
+  let locked = false;
   try {
     const [held] = await connection<{ locked: boolean }[]>`SELECT pg_try_advisory_lock(hashtext(${lock})) AS locked`;
-    if (!held?.locked) return { skipped: "already_running" };
+    locked = held?.locked ?? false;
+    if (!locked) return { skipped: "already_running" };
     const discovery = await discoverFundingCandidates();
     const enrichment = await enrichFundingProjects();
     return { ...discovery, ...enrichment };
   } finally {
-    await connection`SELECT pg_advisory_unlock(hashtext(${lock}))`;
-    connection.release();
+    try {
+      if (locked) await connection`SELECT pg_advisory_unlock(hashtext(${lock}))`;
+    } finally {
+      connection.release();
+    }
   }
 }
 

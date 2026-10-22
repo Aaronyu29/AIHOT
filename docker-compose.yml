@@ -6,6 +6,11 @@ x-app: &app
   build: .
   image: aihot-app
   restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
 
 x-backend: &backend
   <<: *app

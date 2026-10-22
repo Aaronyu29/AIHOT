@@ -305,3 +305,23 @@ cd apps/web && NODE_ENV=production node --env-file=../../.env server.ts   # 网�
 ### 2026-10-22 默认打开全部动态
 
 网站根路径直接展示全部动态；/all 保留为相同内容的独立入口，精选改为 /featured。电脑侧栏、手机顶部切换和底栏默认入口、文章返回、RSS 阅读页链接、站点地图及 Agent 说明同步更新。既有文章、评分、精选与主题标签保持原值；没有数据库迁移。
+
+## 后台错误日志与排查
+
+api、worker、web 的 Docker 日志按每文件 20 MB、每容器 5 个文件轮转。配置在容器重新创建后生效；跨发布需要保留的旧日志，应在替换容器前导出到权限受限的运维目录。
+
+```bash
+docker compose logs --timestamps --since 1h api worker web
+docker compose logs --timestamps -f --tail 100 worker
+docker compose ps
+```
+
+后台异常输出单行 JSON，包含 `time`、`level`、`release`、`msg` 和异常 `err`（类型、消息、数据库/网络代码、HTTP 状态、堆栈及有限的 cause 链）。按可用信息附 `job`、`jobId`、`runId`、`sourceId`、`projectId`、`stage`、`receiptId`。不打印任务 payload、请求头或模型请求/响应；数据库值及付费服务可能回显的拒绝正文不会进入错误日志。预算暂停记录为 warn，真实异常记录为 error。
+
+- `queue job failed`：用 `job`、`jobId` 查询任务状态；异常仍交给 pg-boss 按原有重试策略处理，不吞异常，也不新增付费重试。
+- `scheduled task failed` / `scheduled task reported failure`：用 `job`、`runId` 对应后台运行记录。任务返回 `status: failed` 也标为失败；记录失败原因时数据库再次报错，会另打一条日志，并保留最初异常。
+- `source collection failed` / `news collection failed`：用 `sourceId`、`runId` 对应信源与抓取记录；游标仍按原有成功提交规则处理。
+- `funding analysis failed`：用 `projectId`、`stage` 区分模型调用、证据校验、落库失败，必要时按 `receiptId` 查请求回执。单个项目失败不拦住本轮其他项目；现有重试间隔和预算限制保留。
+- `funding refresh failed`：核对项目及回执，区分预算、明确拒绝和结果未知。结果未知的付费请求继续受回执保护，不能直接重发。
+
+先核对发布版本、服务重启/OOM 记录，再核对实际任务、信源和处理状态；服务存活不代表采集或分析已完成。进程重建会重置容器级重启统计，因此报告时附上启动时间。日志轮转按大小保留，不能据此声称固定保留了多少天。

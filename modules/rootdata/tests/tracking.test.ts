@@ -5,11 +5,31 @@ import { closeDb, sql } from "@aihot/backend/db";
 import { sha256 } from "@aihot/backend/lib/ids";
 import { BudgetExceededError, paidRequest, ReceiptUnknownError } from "@aihot/backend/providers/receipts";
 import { tag } from "../../../tests/setup.ts";
-import { discoverFundingCandidates, enrichFundingProjects, reserveRootDataCredits, updateFundingProject, type RootDataProvider } from "../tracking.ts";
+import { discoverFundingCandidates, enrichFundingProjects, reserveRootDataCredits, updateFundingProject, syncFundingProjects, type RootDataProvider } from "../tracking.ts";
 import { fundingProject, listFundingProjects } from "../publication.ts";
 import { RootDataError } from "../client.ts";
 
 after(closeDb);
+
+test("a failed lock or unlock returns the reserved connection and preserves lock acquisition errors", async t => {
+  const enabled = process.env.ROOTDATA_ENABLED;
+  process.env.ROOTDATA_ENABLED = "false";
+  t.after(() => { process.env.ROOTDATA_ENABLED = enabled; });
+  for (const acquireFails of [true, false]) {
+    let released = 0, queries = 0;
+    const failure = new Error(acquireFails ? "lock connection lost" : "unlock connection lost");
+    const connection = Object.assign(async () => {
+      queries++;
+      if (acquireFails || queries > 1) throw failure;
+      return [{ locked: true }];
+    }, { release: () => { released++; } });
+    const mocked = t.mock.method(sql, "reserve", async () => connection as unknown as Awaited<ReturnType<typeof sql.reserve>>);
+    try { await assert.rejects(syncFundingProjects(), error => error === failure); }
+    finally { mocked.mock.restore(); }
+    assert.equal(released, 1);
+    assert.equal(queries, acquireFails ? 1 : 2);
+  }
+});
 
 async function report(title: string) {
   const id = `rd-${tag()}`;

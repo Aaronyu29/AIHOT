@@ -1,7 +1,8 @@
 import { sql } from '@aihot/backend/db';
 import { modelFor } from '@aihot/backend/editorial/models';
 import { chatJson, MODELS } from '@aihot/backend/providers/llm';
-import { completeReceipt, rejectReceivedResponse } from '@aihot/backend/providers/receipts';
+import { completeReceipt, rejectReceivedResponse, failureKind, failedReceiptId } from '@aihot/backend/providers/receipts';
+import { logTaskError } from '@aihot/backend/lib/log-error';
 import { projectViews, type ProjectRow } from './publication.ts';
 import { ANALYSIS_SYSTEM, ANALYSIS_VERSION, AnalysisSchema, analysisHash, analysisInputs, analysisSources, validateAnalysis } from './analysis-content.ts';
 
@@ -32,14 +33,19 @@ export async function analyzeFundingProjects(ask: AnalysisModel = analyze): Prom
       // At most three projects per schedule, with existing service budgets and durable paid receipts.
       await sql`INSERT INTO rootdata_analyses (project_id, inputs_hash, next_attempt_at) VALUES (${project.id}, ${hash}, now() + interval '1 hour')
         ON CONFLICT (project_id) DO UPDATE SET next_attempt_at = EXCLUDED.next_attempt_at`;
+      let stage = 'model';
+      let receiptId: number | null = null;
       try {
         const result = await ask(project);
+        receiptId = result.receiptId;
+        stage = 'validation';
         let output;
         try { output = validateAnalysis(result.data, project); }
         catch (error) {
           if (result.receiptId !== null) await rejectReceivedResponse(result.receiptId, 'Project analysis failed evidence validation');
           throw error;
         }
+        stage = 'commit';
         const stored = await sql.begin(async tx => {
           const [row] = await tx<ProjectRow[]>`SELECT * FROM rootdata_projects WHERE id = ${project.id} FOR UPDATE`;
           const current = row ? (await projectViews([row], tx))[0] : undefined;
@@ -54,14 +60,19 @@ export async function analyzeFundingProjects(ask: AnalysisModel = analyze): Prom
           return true;
         });
         if (stored) updated++;
-      } catch {
+      } catch (error) {
         failed++;
+        logTaskError(error, { msg: 'funding analysis failed', job: 'rootdata.analysis', projectId: project.id, stage,
+          kind: failureKind(error), receiptId: receiptId ?? failedReceiptId(error), level: failureKind(error) === 'budget' ? 'warn' : 'error' });
         await sql`UPDATE rootdata_analyses SET last_error = '分析暂未完成；请检查模型运行回执与预算，稍后重试' WHERE project_id = ${project.id}`;
       }
     }
     return {updated, failed};
   } finally {
-    if (locked) await connection`SELECT pg_advisory_unlock(hashtext('rootdata.analysis'))`;
-    connection.release();
+    try {
+      if (locked) await connection`SELECT pg_advisory_unlock(hashtext('rootdata.analysis'))`;
+    } finally {
+      connection.release();
+    }
   }
 }

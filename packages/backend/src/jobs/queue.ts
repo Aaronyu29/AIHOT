@@ -6,7 +6,7 @@ import { PgBoss, type SendOptions, type WorkOptions } from "pg-boss";
 import { config } from "../config.ts";
 import { sql, type Db } from "../db.ts";
 import { shutdownSignal } from "../lib/shutdown.ts";
-import { logError } from "../lib/log-error.ts";
+import { logError, logTaskError } from "../lib/log-error.ts";
 import { serverModules, type ModuleQueue } from "../modules.ts";
 export { shutdownSignal } from "../lib/shutdown.ts";
 
@@ -164,7 +164,15 @@ export async function retryReleasedReceiptJobs(): Promise<number> {
 /** The worker's handler for one queue (jobs/*.ts), called with each job's data. */
 export async function work<Q extends QueueName>(boss: PgBoss, name: Q, options: WorkOptions, handler: (data: JobData[Q]) => Promise<unknown>): Promise<void> {
   await ensureQueue(name);
-  await boss.work<JobData[Q]>(name, options, async ([job]) => (job ? handler(job.data) : undefined));
+  await boss.work<JobData[Q]>(name, options, async ([job]) => {
+    if (!job) return;
+    try {
+      return await handler(job.data);
+    } catch (error) {
+      logTaskError(error, { msg: "queue job failed", job: name, jobId: job.id });
+      throw error;
+    }
+  });
 }
 
 /** The worker's handlers for the site's modules' queues. */
@@ -181,14 +189,28 @@ export async function workModuleQueues(boss: PgBoss): Promise<void> {
 // Scheduled task bookkeeping: every run leaves a row, so operators see the latest result.
 
 export async function recordRun<T>(job: string, fn: () => Promise<T>): Promise<T> {
-  const [row] = await sql<{ id: number }[]>`INSERT INTO job_runs (job) VALUES (${job}) RETURNING id`;
+  const started = performance.now();
+  let runId: number | undefined;
   try {
+    const [row] = await sql<{ id: number }[]>`INSERT INTO job_runs (job) VALUES (${job}) RETURNING id`;
+    runId = row!.id;
     const result = await fn();
     const detail = result && typeof result === "object" ? result : { result };
-    await sql`UPDATE job_runs SET status = 'ok', finished_at = now(), detail = ${sql.json(detail as never)} WHERE id = ${row!.id}`;
+    const reportedFailure = result !== null && typeof result === "object" && "status" in result && result.status === "failed";
+    const error = reportedFailure ? "Task reported failure; inspect detail and correlated worker errors" : null;
+    await sql`UPDATE job_runs SET status = ${reportedFailure ? "failed" : "ok"}, finished_at = now(), detail = ${sql.json(detail as never)}, error = ${error} WHERE id = ${runId}`;
+    if (reportedFailure) logTaskError(new Error(error!), { msg: "scheduled task reported failure", job, runId, elapsedMs: Math.round(performance.now() - started) });
     return result;
   } catch (error) {
-    await sql`UPDATE job_runs SET status = 'failed', finished_at = now(), error = ${String(error).slice(0, 4000)} WHERE id = ${row!.id}`;
+    // Log before bookkeeping: a database outage must not hide the original task failure.
+    logTaskError(error, { msg: "scheduled task failed", job, runId, elapsedMs: Math.round(performance.now() - started) });
+    if (runId !== undefined) {
+      try {
+        await sql`UPDATE job_runs SET status = 'failed', finished_at = now(), error = ${logError(error).message.slice(0, 4000)} WHERE id = ${runId}`;
+      } catch (bookkeepingError) {
+        logTaskError(bookkeepingError, { msg: "scheduled task failure recording failed", job, runId });
+      }
+    }
     throw error;
   }
 }
