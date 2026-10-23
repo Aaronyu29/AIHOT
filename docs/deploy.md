@@ -266,11 +266,29 @@ main 的 Docker 检查通过后，保存它实际测试过的镜像 `aihot-image
 python scripts/deploy-ci.py --host ubuntu@<服务器IP> --identity <SSH私钥路径>
 ```
 
-默认仓库 `Aaronyu29/AIHOT`、服务器目录 `/opt/aihot`；可传 `--repo`、`--root`，或用 `--run-id` 指定当前 main 的成功运行。需要事先验证 SSH 主机密钥，服务器用户需要免密 sudo，现有 Docker Compose 项目名为 `aihot`。过期产物需重新运行当前 main 的 Check。此命令不配置 GitHub SSH 密钥，也不会每次 push 自动发布。
+默认仓库 `Aaronyu29/AIHOT`、服务器目录 `/opt/aihot`；可传 `--repo`、`--root`，或用 `--run-id` 指定当前 main 的成功运行。需要事先验证 SSH 主机密钥，服务器用户需要免密 sudo，现有 Docker Compose 项目名为 `aihot`。可用 `--known-hosts` 指定已核验的主机公钥文件；不传时继续使用 OpenSSH 的默认文件。过期产物需重新运行当前 main 的 Check。这条命令保留为人工运维入口；自动发布由下面的独立工作流触发。
 
 脚本检查当前 main、完整 CI 结果、产物校验和镜像 revision，先载入镜像，再按现有停止时限排空 worker；网页保持服务直到切换。备份环境、各角色原镜像身份和数据库后，只运行迁移（不重置或重新 seed 信源），更新 api、worker、web。数据库与 Caddy 容器保持不变。切换应用时可能有短暂中断，并非零停机发布。
 
 版本或页面检查失败时，恢复原环境和各角色原镜像；已执行的在线迁移不自动撤销，也不拿备份覆盖线上数据库。备份和部署回执保存在 `/opt/aihot/.data/deployments/ci-<运行编号>-<时间戳>/`，可能含敏感数据，应保持仅管理员可读。部署期间不要同时从其他对话或终端发布。
+
+### main 完整 CI 成功后自动发布
+
+`.github/workflows/deploy.yml` 使用 `workflow_run` 监听 `Check` 完成，只接受本仓库 main 的 push 或手动重跑 CI，且整轮结论必须为 success。PR、其他分支、fork、失败、取消、跳过或尚未结束的 CI 均不部署。这个工作流文件必须先进入 main 才会生效；在功能分支或未合并 PR 中修改它不会开启生产部署。
+
+启用前，在仓库 Actions secrets 中配置以下三项（值不写进代码或日志）：
+
+| Secret | 内容 |
+| --- | --- |
+| `AIHOT_DEPLOY_HOST` | SSH 的 `用户@主机`，例如现有部署用户和云服务器 IP |
+| `AIHOT_DEPLOY_SSH_KEY` | 该部署用户已授权的 SSH 私钥 |
+| `AIHOT_DEPLOY_KNOWN_HOSTS` | 通过可信渠道核验过的服务器主机公钥，格式为 OpenSSH known_hosts 行 |
+
+可选仓库 variable `AIHOT_DEPLOY_ROOT` 指定安装目录，默认 `/opt/aihot`。GitHub API 使用本次运行自带的只读 token（contents/read、actions/read），不需要长期 GitHub PAT；SSH 凭据只写入 runner 的临时文件并在任务结束时清理，不自动接受陌生主机公钥。缺少凭据会在连接服务器前失败。
+
+自动发布复用上面的同一安装器，保持备份、worker 排空、失败回滚和数据库/Caddy 不重启的行为。工作流串行发布，不会因较新的 CI 完成而中途取消正在安装的版本。开始发布前先检查提交仍为最新 main，下载后和服务器安装前再次检查；已经被 main 新提交取代的运行不继续发布。安装已进入切换阶段时不强行中断，由后续成功 CI 排队更新。部署中不要手动取消任务。
+
+合并工作流并配置好凭据后，下一次 main 的完整 Check 成功会自动发布，包括为当前 main 手动重跑 Check。它不重新构建镜像，也不修改模型、预算、信源、业务逻辑或 HTTPS 配置。上线切换仍可能有短暂中断，不承诺零停机。
 
 ## 不用 Docker
 

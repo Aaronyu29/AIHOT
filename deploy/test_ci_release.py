@@ -1,5 +1,6 @@
 """Reject corrupted or mismatched artifacts before any production action."""
 import hashlib
+from copy import deepcopy
 import importlib.util
 import json
 from pathlib import Path
@@ -9,9 +10,30 @@ import unittest
 spec = importlib.util.spec_from_file_location('installer', Path(__file__).with_name('install-ci-release.py'))
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
+client_spec = importlib.util.spec_from_file_location('deploy_client', Path(__file__).parents[1] / 'scripts' / 'deploy-ci.py')
+client = importlib.util.module_from_spec(client_spec)
+client_spec.loader.exec_module(client)
 
 
 class BundleTests(unittest.TestCase):
+    def test_only_the_completed_successful_main_check_can_release(self):
+        repo, sha = 'owner/site', 'a' * 40
+        workflow = {'id': 100}
+        run = {'head_sha': sha, 'head_branch': 'main', 'head_repository': {'full_name': repo},
+               'status': 'completed', 'conclusion': 'success', 'workflow_id': 100, 'event': 'push'}
+        client.validate_run(run, workflow, sha, repo)
+        manual = {**run, 'event': 'workflow_dispatch'}
+        client.validate_run(manual, workflow, sha, repo)
+        rejected = [
+            {'conclusion': 'failure'}, {'conclusion': 'cancelled'}, {'conclusion': 'skipped'},
+            {'status': 'in_progress'}, {'head_branch': 'feature'}, {'head_sha': 'b' * 40},
+            {'head_repository': {'full_name': 'fork/site'}}, {'head_repository': None},
+            {'workflow_id': 101}, {'event': 'pull_request'}, {'event': 'pull_request_target'},
+        ]
+        for change in rejected:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                client.validate_run({**deepcopy(run), **change}, workflow, sha, repo)
+
     def test_verified_bundle_and_rejections(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
