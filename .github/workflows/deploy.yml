@@ -1,0 +1,80 @@
+# The Check workflow must finish successfully on this repository's main branch.
+# Reuse its tested artifact; never build on the production server.
+name: Deploy main
+run-name: Deploy main ${{ github.event.workflow_run.head_sha }}
+
+on:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Let an in-progress release finish (including rollback); newer runs must not kill it.
+    concurrency:
+      group: aihot-production
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CI_RUN_ID: ${{ github.event.workflow_run.id }}
+      CI_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Skip superseded main commits
+        id: latest
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$current" = "$CI_SHA" ]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo 'main has advanced; this release is skipped.'
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.latest.outputs.current == 'true'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Prepare the pinned SSH identity
+        if: steps.latest.outputs.current == 'true'
+        env:
+          AIHOT_DEPLOY_HOST: ${{ secrets.AIHOT_DEPLOY_HOST }}
+          AIHOT_DEPLOY_SSH_KEY: ${{ secrets.AIHOT_DEPLOY_SSH_KEY }}
+          AIHOT_DEPLOY_KNOWN_HOSTS: ${{ secrets.AIHOT_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          for name in AIHOT_DEPLOY_HOST AIHOT_DEPLOY_SSH_KEY AIHOT_DEPLOY_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository secret: $name"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s\n' "$AIHOT_DEPLOY_SSH_KEY" > "$RUNNER_TEMP/aihot-deploy-key"
+          printf '%s\n' "$AIHOT_DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/aihot-known-hosts"
+      - name: Deploy the successful Check artifact
+        if: steps.latest.outputs.current == 'true'
+        env:
+          AIHOT_DEPLOY_HOST: ${{ secrets.AIHOT_DEPLOY_HOST }}
+          AIHOT_DEPLOY_ROOT: ${{ vars.AIHOT_DEPLOY_ROOT || '/opt/aihot' }}
+        run: |
+          python3 -B scripts/deploy-ci.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --run-id "$CI_RUN_ID" \
+            --host "$AIHOT_DEPLOY_HOST" \
+            --root "$AIHOT_DEPLOY_ROOT" \
+            --identity "$RUNNER_TEMP/aihot-deploy-key" \
+            --known-hosts "$RUNNER_TEMP/aihot-known-hosts"
+      - name: Remove the temporary SSH identity
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/aihot-deploy-key" "$RUNNER_TEMP/aihot-known-hosts"

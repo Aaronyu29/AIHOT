@@ -10,11 +10,21 @@ import subprocess
 import tempfile
 
 
+def validate_run(run, workflow, sha, repo):
+    """A workflow name alone is insufficient: only current main's full Check may release."""
+    if (run.get('head_sha') != sha or run.get('head_branch') != 'main'
+            or (run.get('head_repository') or {}).get('full_name') != repo
+            or run.get('status') != 'completed' or run.get('conclusion') != 'success'
+            or run.get('workflow_id') != workflow['id'] or run.get('event') not in ['push', 'workflow_dispatch']):
+        raise ValueError('Run is not the successful Check workflow for current main')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo', default='Aaronyu29/AIHOT')
     parser.add_argument('--host', required=True, help='SSH user@host; host key must already be trusted')
     parser.add_argument('--identity', type=Path, required=True)
+    parser.add_argument('--known-hosts', type=Path, help='Optional pinned SSH host keys (otherwise use OpenSSH defaults)')
     parser.add_argument('--root', default='/opt/aihot')
     parser.add_argument('--run-id', help='Defaults to the latest successful Check run on current main')
     args = parser.parse_args()
@@ -36,13 +46,15 @@ def main():
         if run is None:
             raise SystemExit('Latest main has no successful Check run yet; no deployment performed')
     workflow = api('actions/workflows/check.yml')
-    if (run['head_sha'] != sha or run['head_branch'] != 'main' or run['head_repository']['full_name'] != args.repo
-            or run['status'] != 'completed' or run['conclusion'] != 'success'
-            or run['workflow_id'] != workflow['id'] or run['event'] not in ['push', 'workflow_dispatch']):
-        raise SystemExit('Run is not the successful Check workflow for current main')
+    try:
+        validate_run(run, workflow, sha, args.repo)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     ssh = str(Path('C:/Windows/System32/OpenSSH/ssh.exe')) if Path('C:/Windows/System32/OpenSSH/ssh.exe').exists() else shutil.which('ssh')
     scp = str(Path('C:/Windows/System32/OpenSSH/scp.exe')) if Path('C:/Windows/System32/OpenSSH/scp.exe').exists() else shutil.which('scp')
     options = ['-i', str(args.identity.resolve()), '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes']
+    if args.known_hosts:
+        options += ['-o', 'UserKnownHostsFile=' + str(args.known_hosts.resolve())]
     # Files are removed locally after use; keep the remote bundle for release audit and rollback.
     with tempfile.TemporaryDirectory(prefix='aihot-ci-') as folder:
         bundle = Path(folder)
